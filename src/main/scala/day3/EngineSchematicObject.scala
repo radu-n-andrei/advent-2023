@@ -18,5 +18,5 @@ final case class EnginePart(lineIndex: Int, columnIndex: Int, number: String)
 
   }
 }
-final case class Symbol(lineIndex: Int, columnIndex: Int)
+final case class Symbol(lineIndex: Int, columnIndex: Int, val symbolType: Char)
     extends EngineSchematicObject

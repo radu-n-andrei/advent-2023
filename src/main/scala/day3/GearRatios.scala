@@ -37,6 +37,7 @@ object GearRatios {
     )
 
     println(s"SOL 2: ${symbols
+        .filter(_.symbolType == '*')
         .map { s =>
           engineParts.filter(ep => ep.lineIndex >= s.lineIndex - 1 && ep.lineIndex <= s.lineIndex + 1 && ep.isSymbolAdjacent(s))
         }
@@ -65,7 +66,7 @@ object GearRatios {
           line
         )
       case x :: xs if x != '.' =>
-        parseLine(xs, acc :+ Symbol(line, currIndex), currIndex + 1, line)
+        parseLine(xs, acc :+ Symbol(line, currIndex, x), currIndex + 1, line)
       case _ :: xs => parseLine(xs, acc, currIndex + 1, line)
     }
 
