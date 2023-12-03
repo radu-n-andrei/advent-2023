@@ -46,6 +46,7 @@ object GearRatios {
 
   }
 
+  @tailrec
   private def parseLine(
       input: List[Char],
       acc: List[EngineSchematicObject],
