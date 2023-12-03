@@ -25,7 +25,7 @@ object Trebuchet {
   ): Int =
     s match {
       case Nil => (firstCoord.getOrElse("0") ++ lastCoord.getOrElse("0")).toInt
-      case x :: xs if x >= '0' && x <= '9' =>
+      case x :: xs if x.isDigit =>
         findCoordinate(
           xs,
           firstCoord.orElse(Some(x.toString())).map(identity),
@@ -35,8 +35,8 @@ object Trebuchet {
       case FullDigit(n) if withText =>
         findCoordinate(
           s.tail,
-          firstCoord.orElse(Some(n.i.toString)).map(identity),
-          Some(n.i.toString),
+          firstCoord.orElse(Some(n)).map(identity),
+          Some(n),
           withText
         )
       case _ :: xs =>
