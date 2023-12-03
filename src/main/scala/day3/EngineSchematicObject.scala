@@ -24,6 +24,5 @@ final case class Symbol(
 
 object Symbol {
   def apply(lineIndex: Int, columnIndex: Int, c: Char): Symbol =
-    if (c == '*') Symbol(lineIndex, columnIndex, isGear = true)
-    else Symbol(lineIndex, columnIndex, isGear = false)
+    Symbol(lineIndex, columnIndex, isGear = c == '*')
 }
