@@ -16,24 +16,14 @@ final case class EnginePart(lineIndex: Int, columnIndex: Int, number: String)
   }
 }
 
-sealed abstract class Symbol(
-    val lineIndex: Int,
-    val columnIndex: Int,
-    val isGear: Boolean
+final case class Symbol(
+    lineIndex: Int,
+    columnIndex: Int,
+    isGear: Boolean
 ) extends EngineSchematicObject(lineIndex, columnIndex)
-
-final case class Gear(
-    override val lineIndex: Int,
-    override val columnIndex: Int
-) extends Symbol(lineIndex, columnIndex, isGear = true)
-
-final case class JunkPart(
-    override val lineIndex: Int,
-    override val columnIndex: Int
-) extends Symbol(lineIndex, columnIndex, isGear = false)
 
 object Symbol {
   def apply(lineIndex: Int, columnIndex: Int, c: Char): Symbol =
-    if (c == '*') Gear(lineIndex, columnIndex)
-    else JunkPart(lineIndex, columnIndex)
+    if (c == '*') Symbol(lineIndex, columnIndex, isGear = true)
+    else Symbol(lineIndex, columnIndex, isGear = false)
 }
