@@ -37,7 +37,7 @@ object GearRatios {
     )
 
     println(s"SOL 2: ${symbols
-        .filter(_.symbolType == '*')
+        .filter(_.isGear)
         .map { s =>
           engineParts.filter(ep => ep.lineIndex >= s.lineIndex - 1 && ep.lineIndex <= s.lineIndex + 1 && ep.isSymbolAdjacent(s))
         }
