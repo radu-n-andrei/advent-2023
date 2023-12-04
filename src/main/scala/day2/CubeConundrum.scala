@@ -13,5 +13,6 @@ object CubeConundrum {
       s"SOL 1: ${games.filter(g => Game.isValid(g, rules)).map(_.id).sum}"
     )
     println(s"SOL 2: ${games.map(_.power).sum}")
+    file.close()
   }
 }

@@ -16,6 +16,7 @@ object GearRatios {
         l._2
       )
     )
+    file.close()
 
     val engineParts = allParts.collect { case ep: EnginePart =>
       ep

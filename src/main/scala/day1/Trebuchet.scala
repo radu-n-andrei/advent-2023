@@ -15,6 +15,7 @@ object Trebuchet {
     )
     println(s"SOL 1: $s1")
     println(s"SOL 2: $s2")
+    file.close()
   }
 
   private def findCoordinate(
