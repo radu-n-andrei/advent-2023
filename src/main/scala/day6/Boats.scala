@@ -9,12 +9,13 @@ object Boats {
     val input = file.getLines().toList
     val races = parseInput(input)
     println(s"SOL1: ${races.map(_.winPossibilities).product}")
-    val singleRace = Race(races
-      .foldLeft(("", ""))((acc, r) =>
-        (acc._1 + r.time.toString, acc._2 + r.distance.toString)
-      ))
-    println(s"SOL2: ${singleRace.winPossibilities}")  
-      
+    val singleRace = Race(
+      races
+        .foldLeft(("", ""))((acc, r) =>
+          (acc._1 + r.time.toString, acc._2 + r.distance.toString)
+        )
+    )
+    println(s"SOL2: ${singleRace.winPossibilities}")
     file.close()
   }
 
