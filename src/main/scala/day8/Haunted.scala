@@ -15,7 +15,7 @@ object Haunted {
     val input = file.getLines().toList
     val desertMap =
       readMap(input, DesertMap(List.empty, Map.empty), stillOnDirections = true)
-    // println(s"SOL1: ${navigate(startNode, 0, desertMap, 0, _ == endNode).len}")
+    println(s"SOL1: ${navigate(startNode, 0, desertMap, 0, _ == endNode).len}")
     val startNodes =
       desertMap.nodes.view.filterKeys(_.endsWith("A")).keySet.toList
     val firstPaths = startNodes.map { startNode =>
@@ -35,11 +35,6 @@ object Haunted {
       s"SOL2: ${extremelyUnlikelyCornerCaseLCM(endsFromFirstRun, shortcuts, desertMap.directionLength)
           .getOrElse(advance(firstPaths, desertMap.directionLength, shortcuts, List.empty, firstPaths.map(_.len).max))}"
     )
-
-    println(
-      s"SOL2: ${advance(firstPaths, desertMap.directionLength, shortcuts, List.empty, firstPaths.map(_.len).max)}"
-    )
-
     file.close()
   }
 
