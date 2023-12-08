@@ -15,7 +15,7 @@ object Haunted {
     val input = file.getLines().toList
     val desertMap =
       readMap(input, DesertMap(List.empty, Map.empty), stillOnDirections = true)
-    //println(s"SOL1: ${navigate(startNode, 0, desertMap, 0, _ == endNode).len}")
+    // println(s"SOL1: ${navigate(startNode, 0, desertMap, 0, _ == endNode).len}")
     val startNodes =
       desertMap.nodes.view.filterKeys(_.endsWith("A")).keySet.toList
     val firstPaths = startNodes.map { startNode =>
@@ -26,12 +26,44 @@ object Haunted {
         navigation.len
       )
     }
-    firstPaths.foreach(println)
+    // precalculate shortcuts (aka roads between Zs)
+    val endsFromFirstRun = firstPaths.map(p => RouteEnd(p.end, p.len))
+    val shortcuts =
+      getShortcuts(endsFromFirstRun, desertMap, Map.empty, List.empty)
+
     println(
-      s"SOL2: ${advance(firstPaths, desertMap, Map.empty, List.empty, firstPaths.map(_.len).max)}"
+      s"SOL2: ${extremelyUnlikelyCornerCaseLCM(endsFromFirstRun, shortcuts, desertMap.directionLength)
+          .getOrElse(advance(firstPaths, desertMap.directionLength, shortcuts, List.empty, firstPaths.map(_.len).max))}"
+    )
+
+    println(
+      s"SOL2: ${advance(firstPaths, desertMap.directionLength, shortcuts, List.empty, firstPaths.map(_.len).max)}"
     )
 
     file.close()
+  }
+
+  private def extremelyUnlikelyCornerCaseLCM(
+      firstRunEnds: List[RouteEnd],
+      shortcuts: Shortcut,
+      mapLen: Int
+  ): Option[Long] = {
+    def gcd(a: Long, b: Long): Long = {
+      val (first, second) = if (a < b) (a, b) else (b, a)
+      if (second % first == 0) first
+      else gcd(first, second % first)
+    }
+
+    if (
+      firstRunEnds.forall(re =>
+        re == shortcuts(RouteStart(re.endNode, (re.len % mapLen).toInt))
+      )
+    ) {
+      println("THIS IS A JOKE!")
+      Some(firstRunEnds.map(_.len).reduce { (a, b) =>
+        a * b / gcd(a, b)
+      })
+    } else None
   }
 
   private def readMap(
@@ -104,87 +136,105 @@ object Haunted {
   @tailrec
   private def advance(
       currentPaths: List[DesertPath],
-      desertMap: DesertMap,
+      desertMapLen: Int,
       shortcuts: Shortcut,
       newPaths: List[DesertPath],
       longestPath: Long
   ): Long = {
-    println(s"Advancing towards: $longestPath")
     currentPaths match {
       case Nil if newPaths.map(_.len).distinct.size == 1 => newPaths.head.len
       case Nil =>
         advance(
           newPaths,
-          desertMap,
+          desertMapLen,
           shortcuts,
           List.empty,
           newPaths.map(_.len).max
         )
       case p :: paths if p.len < longestPath => // this path needs to keep going
-        val (updatedPath, shorts) =
+        val updatedPath =
           tryToMatchHighest(
             p,
-            desertMap,
+            desertMapLen,
             shortcuts,
             longestPath
           ) // recursively grow single path and shortcuts
         advance( // on to the next path
           paths,
-          desertMap,
-          shorts,
+          desertMapLen,
+          shortcuts,
           updatedPath +: newPaths,
           Math.max(longestPath, updatedPath.len)
         )
       case p :: paths => // already at longest
-        advance(paths, desertMap, shortcuts, newPaths :+ p, longestPath)
+        advance(paths, desertMapLen, shortcuts, p +: newPaths, longestPath)
     }
   }
 
   private def toTheNextEnd(
       dp: DesertPath,
-      desertMap: DesertMap,
       shortcuts: Shortcut,
       nextDirection: Int
-  ): (DesertPath, Shortcut) = {
-    val endToEnd = shortcuts
-      .getOrElse(
-        RouteStart(dp.end, nextDirection),
-        navigate(
-          dp.end,
-          nextDirection,
-          desertMap,
-          0,
-          _.endsWith("Z")
-        ) // use shortcut or find next path to a Z
-      )
-    (
-      DesertPath(
-        dp.start,
-        endToEnd.endNode,
-        dp.len + endToEnd.len
-      ),
-      shortcuts + (RouteStart(dp.end, nextDirection) -> endToEnd)
+  ): DesertPath = {
+    val endToEnd = shortcuts(RouteStart(dp.end, nextDirection))
+    DesertPath(
+      dp.start,
+      endToEnd.endNode,
+      dp.len + endToEnd.len
     )
   }
 
   @tailrec
   private def tryToMatchHighest(
       dp: DesertPath,
-      desertMap: DesertMap,
+      desertMapLen: Int,
       shortcuts: Shortcut,
       longestPath: Long
-  ): (DesertPath, Shortcut) =
+  ): DesertPath =
     if (dp.len >= longestPath) {
-      (dp, shortcuts) // at or passed the target
+      dp // at or passed the target
     } else {
-      val nextDirection = (dp.len % desertMap.directionLength).toInt
-      val (updatedPath, shorts) =
-        toTheNextEnd(dp, desertMap, shortcuts, nextDirection)
+      val nextDirection = (dp.len % desertMapLen).toInt
+      val updatedPath =
+        toTheNextEnd(dp, shortcuts, nextDirection)
       tryToMatchHighest(
         updatedPath,
-        desertMap,
-        shorts,
+        desertMapLen,
+        shortcuts,
         longestPath
       )
     }
+
+  @tailrec
+  private def getShortcuts(
+      ends: List[RouteEnd],
+      desertMap: DesertMap,
+      shorcuts: Shortcut,
+      newEnds: List[RouteEnd]
+  ): Shortcut = {
+    ends match {
+      case Nil if newEnds.isEmpty => shorcuts
+      case Nil => getShortcuts(newEnds, desertMap, shorcuts, List.empty)
+      case p :: ps =>
+        val correspondingStart =
+          RouteStart(p.endNode, (p.len % desertMap.directionLength).toInt)
+        if (shorcuts.isDefinedAt(correspondingStart)) {
+          getShortcuts(ps, desertMap, shorcuts, newEnds)
+        } else {
+          val navigation = navigate(
+            correspondingStart.startNode,
+            correspondingStart.directionIndex,
+            desertMap,
+            0,
+            _.endsWith("Z")
+          )
+          getShortcuts(
+            ps,
+            desertMap,
+            shorcuts + (correspondingStart -> navigation),
+            newEnds :+ navigation
+          )
+        }
+    }
+  }
 }
