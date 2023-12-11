@@ -1,207 +1,44 @@
 package day10
 
 final case class PipeEnclosure(
-    enclosure: List[List[Enclosure]],
-    start: Coordinate
+    enclosure: List[List[Enclosure]]
 ) {
   val maxX: Int = enclosure.headOption.fold(0)(_.length - 1)
   val maxY: Int = enclosure.length - 1
 
-  val g1 = EnclosureGap(Coordinate(35, 13), Coordinate(35, 14))
-    val g2 = EnclosureGap(Coordinate(36, 13), Coordinate(36, 14))
-    val g3 = EnclosureGap(Coordinate(37, 13), Coordinate(37, 14))
-    val g4 = EnclosureGap(Coordinate(38, 13), Coordinate(38, 14))
+  def boundedEnclosure(
+  ): List[List[Enclosure]] = {
+    def turnOutside(enc: Enclosure): Enclosure =
+      enc match {
+        case Undecided(coord) => Outside(coord)
+        case x                => x
+      }
 
-  def scanMaze: Unit = {
-    // get left & right side coords moving clockwise (N -> E -> S -> W)
-    // val startPipe =
-    //   PipeMaze.getByCoordinate(enclosure, start).asInstanceOf[ConnectedPipe]
-    // val comingFrom = startPipe.pipe.pipeDirection match {
-    //   case NS(_) => South
-    //   case NE(_) => West
-    //   case NW(_) => East
-    //   case SW(_) => West
-    //   case SE(_) => South
-    //   case EW(_) => West
-    //   case _     => throw new RuntimeException(s"Illegal start pipe $startPipe")
-    // }
-    // val (left, right) = sides(startPipe, List.empty, List.empty, comingFrom)
-    // val leftOut = isOutside(left.distinct)
-    // val rightOut = isOutside(right.distinct)
-    // val enc1 =
-    //   leftOut.foldLeft(enclosure) { (acc, c) =>
-    //     PipeMaze.setByCoordinate(acc, Outside(c))
-    //   }
+    val maxX = enclosure.head.length - 1
+    val maxY = enclosure.length - 1
+    enclosure.zipWithIndex.map {
+      case (l, i) if (i == 0 || i == maxY) => l.map(turnOutside)
+      case (l, i) =>
+        val updatedHead = turnOutside(l.head)
+        val updatedLast = turnOutside(l.last)
+        (updatedHead +: l.tail).dropRight(1) :+ updatedLast
+    }
+  }
 
-    // val enc2 =
-    //   rightOut.foldLeft(enc1) { (acc, c) =>
-    //     PipeMaze.setByCoordinate(acc, Outside(c))
-    //   }
+  def scanMaze: PipeEnclosure = {
     val pipes = enclosure.flatMap(e =>
       e.collect { case c: ConnectedPipe =>
         c
       }
     )
     val g = gaps(pipes, List.empty)
-    
-    println(s"G1: ${g.contains(g1) || g.contains(g1.reversed)}")
-    println(s"G2: ${g.contains(g2) || g.contains(g2.reversed)}")
-    println(s"G3: ${g.contains(g3) || g.contains(g3.reversed)}")
-    println(s"G4: ${g.contains(g4) || g.contains(g4.reversed)}")
-    val bounded = PipeMaze.boundedEnclosure(enclosure)
+    val bounded = boundedEnclosure()
     val outs = bounded.flatMap(encs =>
       encs.collect { case o: Outside =>
         o
       }
     )
-    val expanded =
-      expandOutside(outs, bounded, g)
-    PipeMaze.printMaze(expanded)
-    println(s"SOL2: ${expanded.map(e =>
-          e.count {
-            case Undecided(_) => true
-            case _            => false
-          }
-        )
-        .sum}")
-
-  }
-
-  private def sides(
-      currentPipe: ConnectedPipe,
-      left: List[Coordinate],
-      right: List[Coordinate],
-      comingFrom: CardinalDirection
-  ): (List[Coordinate], List[Coordinate]) =
-    if (
-      currentPipe.pipe.coordinate == start && (left.nonEmpty || right.nonEmpty)
-    ) (left, right)
-    else {
-      val pipeCoord = currentPipe.pipe.coordinate
-      // determine left and right of the pipe
-      val (l, r, switchSides, nextPipe, nextComingFrom) =
-        currentPipe.pipe.pipeDirection match {
-          case NS(_) => // |
-            (
-              List(Coordinate.moveWest(pipeCoord, maxX, maxY)),
-              List(Coordinate.moveEast(pipeCoord, maxX, maxY)),
-              comingFrom == North,
-              if (comingFrom == South)
-                Coordinate.moveNorth(pipeCoord, maxX, maxY)
-              else Coordinate.moveSouth(pipeCoord, maxX, maxY),
-              comingFrom
-            )
-          case NE(_) =>
-            ( // L
-              List(
-                Coordinate.moveSouth(pipeCoord, maxX, maxY),
-                Coordinate.moveWest(pipeCoord, maxX, maxY),
-                Coordinate.moveSouthWest(pipeCoord, maxX, maxY)
-              ),
-              List(Coordinate.moveNorthEast(pipeCoord, maxX, maxY)),
-              comingFrom == North,
-              if (comingFrom == East)
-                Coordinate.moveNorth(pipeCoord, maxX, maxY)
-              else Coordinate.moveEast(pipeCoord, maxX, maxY),
-              if (comingFrom == East) South else West
-            )
-          case NW(_) =>
-            ( // J
-              List(Coordinate.moveNorthWest(pipeCoord, maxX, maxY)),
-              List(
-                Coordinate.moveEast(pipeCoord, maxX, maxY),
-                Coordinate.moveSouth(pipeCoord, maxX, maxY),
-                Coordinate.moveSouthEast(pipeCoord, maxX, maxY)
-              ),
-              comingFrom == North,
-              if (comingFrom == West)
-                Coordinate.moveNorth(pipeCoord, maxX, maxY)
-              else Coordinate.moveWest(pipeCoord, maxX, maxY),
-              if (comingFrom == West) South else East
-            )
-          case SW(_) =>
-            ( // 7
-              List(Coordinate.moveSouthWest(pipeCoord, maxX, maxY)),
-              List(
-                Coordinate.moveEast(pipeCoord, maxX, maxY),
-                Coordinate.moveNorth(pipeCoord, maxX, maxY),
-                Coordinate.moveNorthEast(pipeCoord, maxX, maxY)
-              ),
-              comingFrom == West,
-              if (comingFrom == West)
-                Coordinate.moveSouth(pipeCoord, maxX, maxY)
-              else Coordinate.moveWest(pipeCoord, maxX, maxY),
-              if (comingFrom == West) North else East
-            )
-          case SE(_) =>
-            ( // F
-              List(
-                Coordinate.moveNorth(pipeCoord, maxX, maxY),
-                Coordinate.moveWest(pipeCoord, maxX, maxY),
-                Coordinate.moveNorthWest(pipeCoord, maxX, maxY)
-              ),
-              List(Coordinate.moveSouthEast(pipeCoord, maxX, maxY)),
-              comingFrom == East,
-              if (comingFrom == East)
-                Coordinate.moveSouth(pipeCoord, maxX, maxY)
-              else Coordinate.moveEast(pipeCoord, maxX, maxY),
-              if (comingFrom == East) North else West
-            )
-          case EW(_) => // -
-            (
-              List(Coordinate.moveNorth(pipeCoord, maxX, maxY)),
-              List(Coordinate.moveSouth(pipeCoord, maxX, maxY)),
-              comingFrom == West,
-              if (comingFrom == West) Coordinate.moveEast(pipeCoord, maxX, maxY)
-              else Coordinate.moveWest(pipeCoord, maxX, maxY),
-              comingFrom
-            )
-          case _ => (Nil, Nil, false, None, North)
-        }
-      val (dLeft, dRight) = if (switchSides) (r, l) else (l, r)
-
-      val nextPipeEnc =
-        nextPipe.map(c => PipeMaze.getByCoordinate(enclosure, c)).collect {
-          case cp: ConnectedPipe => cp
-        }
-      if (!nextPipeEnc.isDefined)
-        throw new RuntimeException(
-          s"Illegal next pipe from ${currentPipe.coordinate} => $nextPipe"
-        )
-      sides(
-        nextPipeEnc.get,
-        left ++ parseUndecided(dLeft),
-        right ++ parseUndecided(dRight),
-        nextComingFrom
-      )
-    }
-
-  private def parseUndecided(in: List[Option[Coordinate]]): List[Coordinate] =
-    in.flatten.map(c => PipeMaze.getByCoordinate(enclosure, c)).collect {
-      case Undecided(coord) => coord
-    }
-
-  private def isOutside(coords: List[Coordinate]): List[Coordinate] = {
-    def moveTowardsOutside(
-        coord: Coordinate,
-        direction: CardinalDirection
-    ): Boolean = {
-      val nextCoord = Coordinate.moveTowards(coord, direction, maxX, maxY)
-      nextCoord.fold(true) { c =>
-        PipeMaze.getByCoordinate(enclosure, c) match {
-          case _: Undecided => moveTowardsOutside(c, direction)
-          case _            => false
-        }
-      }
-    }
-    def checkSingle(coord: Coordinate): Boolean = {
-      moveTowardsOutside(coord, East) || moveTowardsOutside(
-        coord,
-        West
-      ) || moveTowardsOutside(coord, North) || moveTowardsOutside(coord, South)
-    }
-
-    coords.filter(checkSingle)
+    PipeEnclosure(expandOutside(outs, bounded, g))
   }
 
   def expandOutside(
@@ -228,18 +65,8 @@ final case class PipeEnclosure(
               g.pipe1
             ) && surroundings.values.toList.contains(g.pipe2)
           )
-        if(out.coord == Coordinate(34,13)) {
-          println(surroundings)
-          println(s"at 34,13 with $potentialGaps")  
-        scala.io.StdIn.readLine()}
-        // if (potentialGaps.nonEmpty) println(s"$out found gaps: $potentialGaps")
-        // scala.io.StdIn.readLine()
         val (undefs, explored) =
           goThroughGap(potentialGaps, gaps, List.empty, List.empty)
-        if(explored.exists(e => e.eq(g1))) {
-          println(s"Gap 1 explored aleady by ${out.coord}")
-          scala.io.StdIn.readLine()
-        }  
         val undefsAsOutside = undefs.map(u => u.turnOutside)
         val allOutsides = newOutsides ++ undefsAsOutside
         val updatedEnclosure =
@@ -272,7 +99,6 @@ final case class PipeEnclosure(
       case Nil =>
         (discoveries, explored)
       case g :: gs =>
-        if(g.eq(g1)) println(s"Entering G1")
         val ends = if (g.isVertical) { // check N and S of both ends
           List(g.pipe1, g.pipe2)
             .map(c =>
@@ -295,13 +121,8 @@ final case class PipeEnclosure(
           ends.flatten
             .map(c => PipeMaze.getByCoordinate(enclosure, c))
             .collect { case u: Undecided =>
-              if(u.coord == Coordinate(39, 14)) println("FUND YU")
               u
             }
-        // if (undefs.nonEmpty) {
-        //   println(s"Found ${undefs} through a gap")
-        // }
-        // println(s"Ends: $ends")
         val endsAsGaps = ends(0).zip(ends(1)).map(c => EnclosureGap(c._1, c._2))
         val potentialGaps = allGaps.filter(eg =>
           !explored.contains(eg) && // not explored
@@ -309,8 +130,6 @@ final case class PipeEnclosure(
             ) ||
               validCorner(eg, g)) // the currernt gap forms a corner
         )
-        // println(s"NEW GAPS: $potentialGaps")
-        // scala.io.StdIn.readLine()
         goThroughGap(
           potentialGaps ++ gs,
           allGaps,
@@ -351,5 +170,30 @@ final case class PipeEnclosure(
           }
         gaps(ps, acc ++ filtered)
     }
+  }
+}
+
+object PipeEnclosure {
+  def apply(layout: List[List[Pipe]], maze: PipeMaze): PipeEnclosure = {
+    val normalizedLayout =
+      PipeMaze.setByCoordinate(
+        layout,
+        maze.start.copy(pipeDirection = maze.startType)
+      )
+    val maxY = layout.length - 1
+    val maxX = layout.headOption.fold(0)(_.length - 1)
+    val baseEnclosed = (0 to maxY)
+      .map(y =>
+        (0 to maxX)
+          .map(x => {
+            val coord = Coordinate(x, y)
+            if (maze.distances.isDefinedAt(coord))
+              ConnectedPipe(PipeMaze.getByCoordinate(normalizedLayout, coord))
+            else Undecided(coord)
+          })
+          .toList
+      )
+      .toList
+    PipeEnclosure(baseEnclosed)
   }
 }

@@ -11,10 +11,19 @@ object Maze {
     val maxY = input.size
     val pipes = readMap(input, List.empty, 0)
     val pipeMaze = PipeMaze(pipes)
+    println(s"SOL1: ${pipeMaze.distances.values.max}")
+    val pipeEnclosure = PipeEnclosure(pipes, pipeMaze)
+    println(s"SOL2: ${pipeEnclosure.scanMaze.enclosure
+        .map(e =>
+          e.count {
+            case Undecided(_) => true
+            case _            => false
+          }
+        )
+        .sum}")
     file.close()
   }
 
-  
   private def readMap(
       input: List[String],
       acc: List[List[Pipe]],

@@ -50,18 +50,6 @@ object Coordinate {
   ): Option[Coordinate] =
     Coordinate(coord.x - 1, coord.y + 1, maxX, maxY)
 
-  def allMoves(coord: Coordinate, maxX: Int, maxY: Int): List[Coordinate] =
-    List(
-      moveNorth(coord, maxX, maxY),
-      moveSouth(coord, maxX, maxY),
-      moveEast(coord, maxX, maxY),
-      moveWest(coord, maxX, maxY),
-      moveNorthEast(coord, maxX, maxY),
-      moveNorthWest(coord, maxX, maxY),
-      moveSouthEast(coord, maxX, maxY),
-      moveSouthWest(coord, maxX, maxY)
-    ).flatten
-
   def allMovesAsMap(
       coord: Coordinate,
       maxX: Int,
@@ -89,14 +77,6 @@ object Coordinate {
       East -> moveEast(coord, maxX, maxY),
       West -> moveWest(coord, maxX, maxY)
     ).filter(_._2.isDefined).view.mapValues(_.get).toMap
-
-    def moveTowards(coord: Coordinate, direction: CardinalDirection, maxX: Int, maxY: Int): Option[Coordinate] = 
-        direction match {
-            case North => moveNorth(coord, maxX, maxY)
-            case South => moveSouth(coord, maxX, maxY)
-            case East => moveEast(coord, maxX, maxY)
-            case West => moveWest(coord, maxX, maxY)
-        }
 }
 
 trait WithCoordinate {
@@ -118,15 +98,15 @@ case object SouthEast extends CardinalDirection
 case object SouthWest extends CardinalDirection
 
 object CardinalDirection {
-    def opposite(cardinalDir: CardinalDirection): CardinalDirection = 
-        cardinalDir match {
-            case North => South
-            case East => West
-            case South => North
-            case West => East
-            case NorthWest => SouthEast
-            case NorthEast => SouthWest
-            case SouthEast => NorthWest
-            case SouthWest => NorthEast
-        }
+  def opposite(cardinalDir: CardinalDirection): CardinalDirection =
+    cardinalDir match {
+      case North     => South
+      case East      => West
+      case South     => North
+      case West      => East
+      case NorthWest => SouthEast
+      case NorthEast => SouthWest
+      case SouthEast => NorthWest
+      case SouthWest => NorthEast
+    }
 }
