@@ -8,7 +8,6 @@ sealed abstract class Enclosure(
     with WithSymbol
 
 case class Outside(coord: Coordinate) extends Enclosure(coord, 'O', true)
-case class Inside(coord: Coordinate) extends Enclosure(coord, 'I', true)
 case class Undecided(coord: Coordinate) extends Enclosure(coord, '?', false) {
     val turnOutside: Outside = Outside(coord)
 }

@@ -41,7 +41,7 @@ object Coordinate {
       maxX: Int,
       maxY: Int
   ): Option[Coordinate] =
-    Coordinate(coord.x + 1, coord.y - 1, maxX, maxY)
+    Coordinate(coord.x + 1, coord.y + 1, maxX, maxY)
 
   def moveSouthWest(
       coord: Coordinate,
@@ -89,6 +89,14 @@ object Coordinate {
       East -> moveEast(coord, maxX, maxY),
       West -> moveWest(coord, maxX, maxY)
     ).filter(_._2.isDefined).view.mapValues(_.get).toMap
+
+    def moveTowards(coord: Coordinate, direction: CardinalDirection, maxX: Int, maxY: Int): Option[Coordinate] = 
+        direction match {
+            case North => moveNorth(coord, maxX, maxY)
+            case South => moveSouth(coord, maxX, maxY)
+            case East => moveEast(coord, maxX, maxY)
+            case West => moveWest(coord, maxX, maxY)
+        }
 }
 
 trait WithCoordinate {

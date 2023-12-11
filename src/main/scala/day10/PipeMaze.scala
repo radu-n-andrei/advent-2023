@@ -12,7 +12,7 @@ object PipeMaze {
   ): T =
     layout(coordinate.y)(coordinate.x)
 
-  private def setByCoordinate[T <: WithCoordinate](
+  def setByCoordinate[T <: WithCoordinate](
       layout: List[List[T]],
       value: T
   ): List[List[T]] =
@@ -98,16 +98,16 @@ object PipeMaze {
     printMaze(normalizedLayout)
     println("=======")
 
-    scanMaze(normalizedLayout, maze)
+    scanMaze(normalizedLayout, maze, start)
     maze
   }
 
   def printMaze[T <: WithSymbol](input: List[List[T]]): Unit =
     input.foreach { case pipeList =>
-      println(pipeList.map(_.toSymbol).mkString(" "))
+      println(pipeList.map(_.toSymbol).mkString(""))
     }
 
-  def scanMaze(layout: List[List[Pipe]], pipeMaze: PipeMaze): Unit = {
+  def scanMaze(layout: List[List[Pipe]], pipeMaze: PipeMaze, start: Pipe): Unit = {
     val maxX = layout.head.length - 1
     val maxY = layout.length - 1
     val baseEnclosed = (0 to maxY)
@@ -123,16 +123,18 @@ object PipeMaze {
       )
       .toList
 
-    val bounded = boundedEnclosure(baseEnclosed)
-    val outs = bounded.flatMap(ec =>
-      ec.collect { case o: Outside =>
-        o
-      }
-    )
-    // gaps(pipeMaze.distances.keySet.toList, bounded, List.empty)
-    val expanded = expandOutside(outs, bounded, maxX, maxY)
-    printMaze(expanded)
-    println(s"SOL2: ${expanded.map(line => line.count(e => !e.isDefind)).sum}")
+    val pe = PipeEnclosure(baseEnclosed, start.coordinate)  
+    pe.scanMaze
+    // val bounded = boundedEnclosure(baseEnclosed)
+    // val outs = bounded.flatMap(ec =>
+    //   ec.collect { case o: Outside =>s
+    //     o
+    //   }
+    // )
+    // // gaps(pipeMaze.distances.keySet.toList, bounded, List.empty)
+    // val expanded = expandOutside(outs, bounded, maxX, maxY)
+    // printMaze(expanded)
+    // println(s"SOL2: ${expanded.map(line => line.count(e => !e.isDefind)).sum}")
   }
 
   def boundedEnclosure(
@@ -154,48 +156,6 @@ object PipeMaze {
         (updatedHead +: l.tail).dropRight(1) :+ updatedLast
     }
   }
-
-  
-  def otherExpand(
-      outside: List[Outside],
-      enclosure: List[List[Enclosure]],
-      maxX: Int,
-      maxY: Int
-  ): List[List[Enclosure]] = {
-    outside match {
-      case Nil => enclosure
-      case out :: outs =>
-        val surroundings = Coordinate.allMovesAsMap(out.coord, maxX, maxY)
-        val surroundingsAsEnclosure =
-          surroundings.view.mapValues(c => getByCoordinate(enclosure, c)).toMap
-        val newOutsides = surroundingsAsEnclosure.collect {
-          case (_, u: Undecided) => u.turnOutside
-          // if pipe and going in the same general direction => ride the pipe
-        }.toList
-
-        val surroundingDirs = surroundingsAsEnclosure.view
-          .filterKeys(List(North, South, East, West).contains)
-          .toMap
-        val maybeGaps = surroundingsAsEnclosure.view
-          .filterKeys(List(North, South, East, West).contains)
-          .toMap
-          .collect {
-            case (dir, cp: ConnectedPipe) if cp.pipe.connectedTowards(dir) =>
-              Gap2.maybeGap(cp, enclosure, maxX, maxY)
-          }.flatten.toList
-          enclosure
-    }
-  }
-
-  def goThroughGap2(gaps: List[Gap2], enclosure: List[List[Enclosure]], maxX: Int, maxY: Int, acc: List[Outside]) = 
-    gaps match {
-        case Nil => acc
-        case g :: gs => acc
-    }
-
-  def expandGap(gap: Gap2, enclosure: List[List[Enclosure]], maxX: Int, maxY: Int): Unit = {
-
-  }  
 
   def expandOutside(
       outside: List[Outside],
@@ -347,5 +307,10 @@ object PipeMaze {
     if (gapTowards == directionChangedTo)
       CardinalDirection.opposite(directionChangeFrom)
     else directionChangeFrom
+
+
+
+    
+    
 
 }
