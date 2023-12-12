@@ -142,7 +142,8 @@ final case class SpringRow(row: List[Spring], survey: List[Int]) {
     val rows = prepareRows(multiplied.row, List.empty)
 
     def checkRows(atIndex: Int, remainingSurvey: List[Int]): Long = {
-      if (rows.length == 1) SpringRow(rows.head, remainingSurvey).evaluate()
+      if (rows.length == 1)
+        SpringRow(rows.head, remainingSurvey).evaluate()
       else if (atIndex == rows.length) if (remainingSurvey.nonEmpty) 0L else 1L
       else {
         (0 to remainingSurvey.length).map { i =>
@@ -182,8 +183,10 @@ final case class SpringRow(row: List[Spring], survey: List[Int]) {
       else {
         attemptGroup(springs, surveys) match {
           case Valid(maybeGrouping, remaining, next) =>
-            if (maybeGrouping.startsWith("#")) // no more shifting possible
-              acc + eval(remaining, surveys.tail, 0)
+            if (maybeGrouping.startsWith("#")) {
+              val e = eval(remaining, surveys.tail, 0)
+              acc + e
+            } // no more shifting possible
             else {
               val rest = eval(remaining, surveys.tail, 0)
               eval(
@@ -208,7 +211,14 @@ final case class SpringRow(row: List[Spring], survey: List[Int]) {
     s
   }
 
-  def pootentialScenarios: Long = {
+  def pootentialScenarios(index: Option[Int] = None): Long = {
+
+    def trim(l: List[Spring]): List[Spring] = {
+      l.dropWhile {
+        case FunctionalSpring => true
+        case _                => false
+      }
+    }
 
     @tailrec
     def eval(
@@ -217,45 +227,63 @@ final case class SpringRow(row: List[Spring], survey: List[Int]) {
         potential: List[List[Spring]]
     ): List[List[Spring]] = {
       attemptGroup(springs, surveys) match {
-        case Valid(maybeGrouping, remaining, next) =>
+        case Valid(maybeGrouping, remaining, next) => {
           if (maybeGrouping.startsWith("#")) // no more shifting possible
-            potential :+ remaining // done
+            potential :+ trim(remaining) // done
           else
-            eval(next, surveys, potential :+ remaining)
+            eval(next, surveys, potential :+ trim(remaining))
+        }
         case Invalid(InvalidGrouping(remaining)) =>
           eval(remaining, surveys, potential)
         // invalid grouping, skip ahead to the next potential grouping
-        case Invalid(_) =>
-          // println("DONE")
+        case Invalid(r) =>
           potential // premature ending - either the rest are not enough or we reached an un-shiftable place
       }
     }
 
-    def recAtts(surs: List[Int], springs: List[Spring]): Long = {
-      val potentials = eval(springs, surs, List.empty)
-      if (surs.length == 1) {
-        potentials.count(l =>
-          !l.exists {
-            case DamagedSpring => true
-            case _             => false
-          }
-        )
-      } else {
-        potentials.map(s => recAtts(surs.tail, s)).sum
+    def isDone(t: SpringRow): Boolean = t.row.forall {
+      case DamagedSpring => false
+      case _             => true
+    }
+
+    @tailrec
+    def recs(
+        todos: List[SpringRow],
+        failures: List[SpringRow],
+        l: Long
+    ): Long = {
+      todos match {
+        case Nil => l
+        case t :: ts if t.survey.isEmpty && isDone(t) =>
+          recs(ts, failures, l + 1)
+        case t :: ts if t.survey.isEmpty => recs(ts, failures :+ t, l)
+        case t :: ts =>
+          val potentials = eval(t.row, t.survey, List.empty)
+            .map(p => SpringRow(p, t.survey.tail))
+            .distinct
+            .filterNot(failures.contains)
+          val updatedFailures =
+            if (potentials.isEmpty) failures :+ t else failures
+          recs(potentials ++ ts, updatedFailures, l)
       }
     }
-    recAtts(survey, row)
-    // val p = eval(row, survey, List.empty)
-    // p.foreach { l =>
-    //   println(l.map(_.symbol).mkString)
-    //   println("===============")
-    //   eval(l, survey.tail, List.empty).foreach(l =>
-    //     println(l.map(_.symbol).mkString)
-    //   )
-    //   scala.io.StdIn.readLine()
-    //   ()
-    // }
 
+    if (survey.isEmpty)
+      if (isDone(this)) 1 else 0
+    else {
+      val e =
+        eval(row, survey, List.empty)
+          .map(p => SpringRow(p, survey.tail))
+          .distinct
+
+      val s = recs(
+        e,
+        List.empty,
+        0
+      )
+      index.foreach(i => println(s"Done with $i"))
+      s
+    }
   }
 
   private def attemptGroup(
@@ -266,41 +294,45 @@ final case class SpringRow(row: List[Spring], survey: List[Int]) {
       case FunctionalSpring => true
       case _                => false
     }
-    val currentSurvey = surveys.head
-    val grouping = clearFunctional.take(currentSurvey + 1)
-    val maybeGrouping = grouping.map(_.symbol).mkString
-    val remaining = clearFunctional.drop(currentSurvey + 1)
-    val validReg = ("""[\?|\#]{""" + currentSurvey + """}[\.|\?]*$""").r
-    val fatalReg = """.*\#+.*\.+.*""".r
-
-    if (validReg.matches(maybeGrouping)) {
-      Valid(maybeGrouping, remaining, clearFunctional.tail)
-    } else {
-      val skip = grouping.dropWhile {
-        case FunctionalSpring => false
-        case _                => true
-      }
-      val futureRemaining =
-        if (skip.nonEmpty) skip.tail ++ remaining else remaining
-      val minToFinish = surveys.sum + surveys.length - 1
-      // can't finish the survey with what we have left
+    if (surveys.isEmpty) {
       if (
-        maybeGrouping.size < currentSurvey || futureRemaining.length < minToFinish || !futureRemaining
-          .exists {
-            case DamagedSpring | Unknown => true
-            case FunctionalSpring        => false
-          }
-      ) {
-        Invalid(InsufficientElements)
-      }
-      // would shifting still be possible?
-      else if (
-        fatalReg.matches(maybeGrouping) || maybeGrouping.startsWith("#")
-      ) {
-        Invalid(InvalidGroupingFatal)
+        springs.exists {
+          case DamagedSpring => true
+          case _             => false
+        }
+      ) Invalid(InsufficientElements)
+      else Valid("", List.empty, List.empty)
+    } else {
+      val currentSurvey = surveys.head
+      val grouping = clearFunctional.take(currentSurvey + 1)
+      val maybeGrouping = grouping.map(_.symbol).mkString
+      val remaining = clearFunctional.drop(currentSurvey + 1)
+      val validReg = ("""[\?|\#]{""" + currentSurvey + """}[\.|\?]*$""").r
+      val fatalReg = """.*\#+.*\.+.*""".r
+
+      if (validReg.matches(maybeGrouping)) {
+        Valid(maybeGrouping, remaining, clearFunctional.tail)
       } else {
-        // not fatal, skip ahead
-        Invalid(InvalidGrouping(clearFunctional.tail))
+        val minToFinish = surveys.sum + surveys.length - 1
+        // can't finish the survey with what we have left
+        if (
+          maybeGrouping.size < currentSurvey || clearFunctional.isEmpty || (clearFunctional.length - 1) < minToFinish || clearFunctional.tail
+            .forall {
+              case DamagedSpring | Unknown => false
+              case FunctionalSpring        => true
+            }
+        ) {
+          Invalid(InsufficientElements)
+        }
+        // would shifting still be possible?
+        else if (
+          fatalReg.matches(maybeGrouping) || maybeGrouping.startsWith("#")
+        ) {
+          Invalid(InvalidGroupingFatal)
+        } else {
+          // not fatal, skip ahead
+          Invalid(InvalidGrouping(clearFunctional.tail))
+        }
       }
     }
   }
