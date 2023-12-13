@@ -563,7 +563,9 @@ final case class SpringRow(row: List[Spring], survey: List[Int]) {
               currentSurvey,
               acc :+ BlockAttempt(
                 currentIndex,
-                Option.when(nextBlock >= 0)(nextBlock + currentIndex + currentSurvey + 1)
+                Option.when(nextBlock >= 0)(
+                  nextBlock + currentIndex + currentSurvey + 1
+                )
               ),
               attempt.startsWith("#")
             )
@@ -582,12 +584,12 @@ final case class SpringRow(row: List[Spring], survey: List[Int]) {
       .map(i => (i -> startPossibilities(rowAsString, 0, i, List.empty, false)))
       .toMap
 
-    //surveyMap.values.foreach(println)
+    // SHAME!
     var partials: Map[(Int, List[Int]), Long] = Map.empty
     // surveyMap.foreach(println)
-    //println(s"MAP DONE")
+    // println(s"MAP DONE")
     def recCalc(currentIndex: Int, surveys: List[Int], lastLen: Int): Long = {
-      //println(s"At $currentIndex looking for ${surveys.head}")
+      // println(s"At $currentIndex looking for ${surveys.head}")
       // final point
       if (surveys.length == 1) {
         val s = surveyMap(surveys.head)
@@ -597,8 +599,8 @@ final case class SpringRow(row: List[Spring], survey: List[Int]) {
               .contains("#")
           )
           .length
-        //println(s"Done, goot $s")  
-        //scala.io.StdIn.readLine()
+        // println(s"Done, goot $s")
+        // scala.io.StdIn.readLine()
         partials = partials + ((currentIndex, surveys) -> s)
         s
       } else {
@@ -611,25 +613,98 @@ final case class SpringRow(row: List[Spring], survey: List[Int]) {
             // scala.io.StdIn.readLine()
             f
           })
-          //println(s"FOund potentials: $pot")
-          //scala.io.StdIn.readLine()
-        val s =  pot.map { ba =>
-            val nextIndex = ba.index + surveys.head + 1
-            partials.getOrElse(
-              (nextIndex, surveys.tail),
-              recCalc(ba.index + surveys.head + 1, surveys.tail, surveys.head + 1)
-            )
-            //recCalc(ba.index + surveys.head + 1, surveys.tail, surveys.head + 1)
-          }
-          .sum
+        // println(s"FOund potentials: $pot")
+        // scala.io.StdIn.readLine()
+        val s = pot.map { ba =>
+          val nextIndex = ba.index + surveys.head + 1
+          partials.getOrElse(
+            (nextIndex, surveys.tail),
+            recCalc(ba.index + surveys.head + 1, surveys.tail, surveys.head + 1)
+          )
+          // recCalc(ba.index + surveys.head + 1, surveys.tail, surveys.head + 1)
+        }.sum
         partials = partials + ((currentIndex, surveys) -> s)
         s
       }
     }
-    val s = recCalc(0, survey, 0)
-    //println(partials.size)
-
-    s
+    @tailrec
+    def recCalcIm(
+        currentIndex: Int,
+        surveys: List[Int],
+        sol: Long,
+        partialMap: Map[(Int, List[Int]), Long],
+        acc: List[BlockAttemptSave]
+    ): Long = {
+      if (surveys.length == 1) {
+        val s = surveyMap(surveys.head)
+          .filter(ba =>
+            ba.index >= currentIndex && ba.nextUncheckedDmgIndex.isEmpty && !rowAsString
+              .substring(currentIndex, ba.index)
+              .contains("#")
+          )
+          .length
+        if (acc.isEmpty) sol + s
+        else
+          recCalcIm(
+            acc.head.startIndex,
+            acc.head.survey,
+            sol + s,
+            partialMap + ((currentIndex, surveys) -> s),
+            acc.tail
+          )
+      } else {
+        val pot = surveyMap(surveys.head)
+          .filter(ba => {
+            ba.index >= currentIndex && !rowAsString
+              .substring(currentIndex, ba.index)
+              .contains("#")
+          })
+        if (pot.isEmpty) {
+          if (acc.isEmpty) sol
+          else {
+            recCalcIm(
+              acc.head.startIndex,
+              acc.head.survey,
+              sol,
+              partialMap + ((currentIndex, surveys) -> 0),
+              acc.tail
+            )
+          }
+        } else {
+          val mapped = pot.map(ba =>
+            partialMap.get((ba.index + surveys.head + 1, surveys.tail))
+          )
+          if (mapped.forall(_.isDefined)) {
+            val s = mapped.flatten.sum
+            if (acc.isEmpty) sol + s
+            else {
+              recCalcIm(
+                acc.head.startIndex,
+                acc.head.survey,
+                sol + s,
+                partialMap + ((currentIndex, surveys) -> s),
+                acc.tail
+              )
+            }
+          } else {
+            val (known, unknown) = pot.partition(ba => partialMap.isDefinedAt((ba.index + surveys.head + 1, surveys.tail)))
+            val s = known.map(ba => partialMap((ba.index + surveys.head + 1, surveys.tail))).sum
+            val headPotential = unknown.head
+            recCalcIm(
+              headPotential.index + surveys.head + 1,
+              surveys.tail,
+              sol + s,
+              partialMap,
+              unknown.tail.map(ba =>
+                BlockAttemptSave(ba.index + surveys.head + 1, surveys.tail)
+              ) ++ acc
+            )
+          }
+        }
+      }
+    }
+    recCalcIm(0, survey, 0, Map.empty, List.empty)
+    //recCalc(0, survey, 0)
   }
 }
 
