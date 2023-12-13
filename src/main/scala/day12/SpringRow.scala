@@ -6,7 +6,7 @@ final case class SpringRow(row: String, survey: List[Int]) {
   def evaluateWithMaps: Long = {
     /**
       * Find all possible valid start locations for a survey length S
-      * To be valid, it must not be of size S, preceded by a # and followed by ? or . or $.
+      * To be valid, it must be of size S, not preceded by a # and followed by ? or . or $.
       * Each valid position is described by its start index and the potential location of the first
       * known # not included in its grouping.
       */
