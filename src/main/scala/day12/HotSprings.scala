@@ -9,10 +9,12 @@ object HotSprings {
     val springRows = readInput(input, List.empty)
     val multiplied = springRows.map(s => SpringRow.multiplyBy(s, 5))
     
+    println(multiplied.map(_.evaluateWithMaps).sum)
+    //println(springRows.head.evaluateAsString())
     //println(multiplied.map(_.pootentialScenarios))
-    println(springRows.zipWithIndex.map {
-      case (s, i) => s.allPossibilities(5, i)
-    }.sum)
+    // println(springRows.zipWithIndex.map {
+    //   case (s, i) => s.allPossibilities(5, i)
+    // }.sum)
     
     //println(s"SOL1: ${springRows.zipWithIndex.map(x => x._1.allPossibilities(5, x._2)).sum}")
     //println(multiplied.head.pootentialScenarios)

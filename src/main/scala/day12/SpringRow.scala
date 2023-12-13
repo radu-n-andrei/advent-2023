@@ -112,6 +112,196 @@ final case class SpringRow(row: List[Spring], survey: List[Int]) {
     index.foreach(i => println(s"Done $i"))
     sol
   }
+  // TODO maybe with regular expressions and indexes?
+  def evaluateAsString(index: Option[Int] = None): Int = {
+    def checkRow(
+        rows: String,
+        currentSurvey: List[Int],
+        prevDamaged: Boolean
+    ): Int =
+      rows match {
+        case "" if currentSurvey.forall(_ == 0) =>
+          1 // reached the end of the list and survey is empty => Success
+        case "" =>
+          0 // reached the end of the list and survey is not empty => Failure
+        case r if r.length < currentSurvey.sum + currentSurvey.length - 1 =>
+          0 // not enough elemets to continue survey
+        case r if currentSurvey.isEmpty && r.indexOf("#") >= 0 =>
+          0 // survey clear, if only ? and . left => solution else failure
+        case r if currentSurvey.isEmpty && r.indexOf("#") < 0 =>
+          1 // survey clear, if only ? and . left => solution else failure
+        case r if r.startsWith("#") =>
+          if (currentSurvey.head == 0)
+            0 // a damaged spring is found sbut the current survey has been fulfilled
+          else
+            checkRow( // expand on the current damage survey
+              r.tail,
+              (currentSurvey.head - 1) +: currentSurvey.tail,
+              true
+            )
+        case r if r.startsWith(".") =>
+          val current = currentSurvey.head
+          if (current == 0)
+            checkRow(
+              r.tail,
+              currentSurvey.tail,
+              false
+            )
+          else if (prevDamaged) 0
+          else checkRow(r.tail, currentSurvey, false)
+        case r if r.startsWith("?") =>
+          val current = currentSurvey.head
+          if (current == 0)
+            checkRow(
+              r.tail,
+              currentSurvey.tail,
+              false
+            ) // survey head 0 => Functional
+          else {
+            checkRow(
+              r.tail,
+              (current - 1) +: currentSurvey.tail,
+              true
+            ) + // try Damaged
+              (if (!prevDamaged)
+                 checkRow(
+                   r.tail,
+                   currentSurvey,
+                   false
+                 ) // try Functional
+               else 0)
+          }
+      }
+
+    val sol = checkRow(row.map(_.symbol).mkString, survey, false)
+    index.foreach(i => println(s"Done $i"))
+    sol
+  }
+
+  def tailEvaluate(index: Option[Int] = None): Long = {
+    @tailrec
+    def checkRow(
+        rows: List[Spring],
+        currentSurvey: List[Int],
+        prevDamaged: Boolean,
+        acc: List[SpringRowSave],
+        value: Long
+    ): Long =
+      rows match {
+        case Nil if currentSurvey.forall(_ == 0) && acc.isEmpty => value + 1
+        case Nil if currentSurvey.forall(_ == 0) =>
+          val s = acc.head
+          checkRow(
+            s.row,
+            s.survey,
+            s.prevDamaged,
+            acc.tail,
+            value + 1
+          ) // reached the end of the list and survey is empty => Success
+        case Nil if acc.isEmpty => value
+        case Nil =>
+          val s = acc.head
+          checkRow(
+            s.row,
+            s.survey,
+            s.prevDamaged,
+            acc.tail,
+            value
+          ) // reached the end of the list and survey is not empty => Failure
+        case r
+            if r.length < currentSurvey.sum + currentSurvey.length - 1 && acc.isEmpty =>
+          value
+        case r if r.length < currentSurvey.sum + currentSurvey.length - 1 =>
+          val s = acc.head
+          checkRow(
+            s.row,
+            s.survey,
+            s.prevDamaged,
+            acc.tail,
+            value
+          ) // not enough elemets to continue survey
+        case r
+            if currentSurvey.isEmpty && acc.isEmpty => { // survey clear, if only ? and . left => solution else failure
+          val damaged = r.count {
+            case DamagedSpring => true
+            case _             => false
+          }
+          val bonus = if (damaged == 0) 1 else 0
+          value + bonus
+        }
+        case r if currentSurvey.isEmpty =>
+          val s = acc.head
+          val damaged = r.count {
+            case DamagedSpring => true
+            case _             => false
+          }
+          val bonus = if (damaged == 0) 1 else 0
+          checkRow(s.row, s.survey, s.prevDamaged, acc.tail, value + bonus)
+        case r :: rs =>
+          r match {
+            case DamagedSpring =>
+              checkRow( // expand on the current damage survey
+                rs,
+                (currentSurvey.head - 1) +: currentSurvey.tail,
+                true,
+                acc,
+                value
+              )
+            case FunctionalSpring
+                if prevDamaged && currentSurvey.head != 0 && acc.isEmpty =>
+              value
+            case FunctionalSpring if prevDamaged && currentSurvey.head != 0 =>
+              checkRow(
+                acc.head.row,
+                acc.head.survey,
+                acc.head.prevDamaged,
+                acc.tail,
+                value
+              ) // damage seq not done
+            case FunctionalSpring =>
+              val nextCheck =
+                if (currentSurvey.head == 0) currentSurvey.tail
+                else currentSurvey
+              checkRow(rs, nextCheck, false, acc, value)
+            case Unknown =>
+              if (currentSurvey.isEmpty) // shortcut?
+                checkRow(
+                  rs,
+                  currentSurvey,
+                  false,
+                  acc,
+                  value
+                ) // survey done => Functional
+              else {
+                val current = currentSurvey.head
+                if (current == 0)
+                  checkRow(
+                    rs,
+                    currentSurvey.tail,
+                    false,
+                    acc,
+                    value
+                  ) // survey head 0 => Functional
+                else {
+                  val functionalSave =
+                    if (!prevDamaged) None
+                    else Some(SpringRowSave(rs, currentSurvey, false))
+                  checkRow(
+                    rs,
+                    (current - 1) +: currentSurvey.tail,
+                    true,
+                    functionalSave.fold(acc)(acc :+ _),
+                    value
+                  )
+                }
+              }
+          }
+      }
+
+    val sol = checkRow(row, survey, false, List.empty, 0)
+    index.foreach(i => println(s"Done $i"))
+    sol
+  }
 // if all in a row are ? or # it relies on evaluate => inefficient
   def allPossibilities(mult: Int, rowIndex: Int): Long = {
     val multiplied = SpringRow.multiplyBy(this, mult)
@@ -143,7 +333,7 @@ final case class SpringRow(row: List[Spring], survey: List[Int]) {
 
     def checkRows(atIndex: Int, remainingSurvey: List[Int]): Long = {
       if (rows.length == 1)
-        SpringRow(rows.head, remainingSurvey).evaluate()
+        SpringRow(rows.head, remainingSurvey).evaluateAsString()
       else if (atIndex == rows.length) if (remainingSurvey.nonEmpty) 0L else 1L
       else {
         (0 to remainingSurvey.length).map { i =>
@@ -151,7 +341,7 @@ final case class SpringRow(row: List[Spring], survey: List[Int]) {
           val solutionsForI = SpringRow(
             rows(atIndex),
             remainingSurvey.take(i)
-          ).evaluate() // how many solutions with i survey length
+          ).evaluateAsString() // how many solutions with i survey length
           if (solutionsForI != 0)
             solutionsForI * checkRows(
               atIndex + 1,
@@ -336,7 +526,118 @@ final case class SpringRow(row: List[Spring], survey: List[Int]) {
       }
     }
   }
+
+  def evaluateWithMaps: Long = {
+    val rowAsString = row.map(_.symbol).mkString
+    println(rowAsString)
+    // part 1 startPossibilities
+    @tailrec
+    def startPossibilities(
+        remaining: String,
+        currentIndex: Int,
+        currentSurvey: Int,
+        acc: List[BlockAttempt],
+        prevDamaged: Boolean
+    ): List[BlockAttempt] =
+      if (remaining.size < currentSurvey) acc
+      else {
+        if (prevDamaged)
+          startPossibilities(
+            remaining.tail,
+            currentIndex + 1,
+            currentSurvey,
+            acc,
+            remaining.startsWith("#")
+          )
+        else {
+          val reg = ("""[\?|\#]{""" + currentSurvey + """}[\?|\.]*$""").r
+          // val cleared = remaining.takeWhile(_ == '.')
+
+          val attempt = remaining.take(currentSurvey + 1)
+
+          if (reg.matches(attempt)) {
+            val nextBlock = remaining.drop(currentSurvey + 1).indexOf('#')
+            startPossibilities(
+              remaining.tail,
+              currentIndex + 1,
+              currentSurvey,
+              acc :+ BlockAttempt(
+                currentIndex,
+                Option.when(nextBlock >= 0)(nextBlock + currentIndex + currentSurvey + 1)
+              ),
+              attempt.startsWith("#")
+            )
+          } else
+            startPossibilities(
+              remaining.tail,
+              currentIndex + 1,
+              currentSurvey,
+              acc,
+              attempt.startsWith("#")
+            )
+        }
+      }
+    // construct map
+    val surveyMap = survey.distinct
+      .map(i => (i -> startPossibilities(rowAsString, 0, i, List.empty, false)))
+      .toMap
+
+    //surveyMap.values.foreach(println)
+    var partials: Map[(Int, List[Int]), Long] = Map.empty
+    // surveyMap.foreach(println)
+    //println(s"MAP DONE")
+    def recCalc(currentIndex: Int, surveys: List[Int], lastLen: Int): Long = {
+      //println(s"At $currentIndex looking for ${surveys.head}")
+      // final point
+      if (surveys.length == 1) {
+        val s = surveyMap(surveys.head)
+          .filter(ba =>
+            ba.index >= currentIndex && ba.nextUncheckedDmgIndex.isEmpty && !rowAsString
+              .substring(currentIndex, ba.index)
+              .contains("#")
+          )
+          .length
+        //println(s"Done, goot $s")  
+        //scala.io.StdIn.readLine()
+        partials = partials + ((currentIndex, surveys) -> s)
+        s
+      } else {
+        val pot = surveyMap(surveys.head)
+          .filter(ba => {
+            val f = ba.index >= currentIndex && !rowAsString
+              .substring(currentIndex, ba.index)
+              .contains("#")
+            // println(s"Checking $currentIndex for $ba. Valid? $f")
+            // scala.io.StdIn.readLine()
+            f
+          })
+          //println(s"FOund potentials: $pot")
+          //scala.io.StdIn.readLine()
+        val s =  pot.map { ba =>
+            val nextIndex = ba.index + surveys.head + 1
+            partials.getOrElse(
+              (nextIndex, surveys.tail),
+              recCalc(ba.index + surveys.head + 1, surveys.tail, surveys.head + 1)
+            )
+            //recCalc(ba.index + surveys.head + 1, surveys.tail, surveys.head + 1)
+          }
+          .sum
+        partials = partials + ((currentIndex, surveys) -> s)
+        s
+      }
+    }
+    val s = recCalc(0, survey, 0)
+    //println(partials.size)
+
+    s
+  }
 }
+
+final case class SpringRowSave(
+    row: List[Spring],
+    survey: List[Int],
+    prevDamaged: Boolean
+)
 
 object SpringRow {
   def apply(s: String): SpringRow = {
