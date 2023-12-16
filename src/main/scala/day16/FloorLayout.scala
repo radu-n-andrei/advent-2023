@@ -34,8 +34,30 @@ final case class FloorLayout(tiles: List[List[Tile]]) {
             }
             
         }
+
+        
         enterTile(List((c, towards)), List.empty)
-    }    
+    }  
+
+    
+         @tailrec
+        def enterTileWithExits(coordinates: List[(Coordinate, Direction)], acc: List[(Coordinate, Direction)], exits: List[Coordinate]): (Int, List[Coordinate]) = {
+            coordinates match {
+                case Nil => (acc.map(_._1).distinct.length, exits)
+                case c :: coords if acc.contains(c) => enterTileWithExits(coords, acc, exits)
+                case (coord, direction) :: coords => 
+                    val nextDirs = tilesAsMap(coord).energize(direction)
+                    val nextTileCoords = nextDirs.map(d => (d.next(coord), d.opposite)).filter {
+                        case (newCoord, _) => newCoord.x >= 0 && newCoord.x < width && newCoord.y >=0 && newCoord.y < height
+                    }
+                    if(nextTileCoords.isEmpty) {
+                        enterTileWithExits(coords, (coord, direction) +: acc, coord +: exits)
+                    } else 
+                        enterTileWithExits(nextTileCoords ++ coords, (coord, direction) +: acc, exits)
+            }
+            
+        }
+
 
     def maxEnergy: Int = {
         val northBound = (0 until width).map(i => (Coordinate(i, 0), North))
@@ -44,10 +66,19 @@ final case class FloorLayout(tiles: List[List[Tile]]) {
         val westBound = (0 until height).map(i => (Coordinate(0, i), West))
 
         // map!
-
-        (northBound ++ southBound ++ eastBound ++ westBound).map {
-            case (coord, enteringFrom) => energizeFrom(coord, enteringFrom)
-        }.max
+        val allBounds = northBound ++ southBound ++ eastBound ++ westBound
+        allBounds.foldLeft((List.empty[Coordinate], 0)) {
+            case ((exits, acc), start) => 
+                println(s"Exploring $start")
+                if(exits.contains(start._1)) {
+                println(s"SKIPPING $start")
+                (exits, acc) 
+            }
+            else {
+                val (energ, exitsReached) = enterTileWithExits(List(start), List.empty, List.empty)
+                (exits ++ exitsReached, Math.max(acc, energ))
+            } 
+        }._2
     }
 
 }
