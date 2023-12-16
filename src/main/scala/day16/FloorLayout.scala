@@ -63,12 +63,58 @@ final case class FloorLayout(tiles: List[List[Tile]]) {
         }
     }
 
+  @tailrec  
+  def enterTileWithShortcuts2(
+      coordinates: List[DirectedTile],
+      acc: List[DirectedTile],
+      shortcuts: TileCache
+  ): (
+      Int,
+      TileCache
+  ) =
+    coordinates match {
+      case Nil => (acc.map(_.coord).distinct.length, shortcuts)
+      case c :: coords if acc.contains(c) =>
+        enterTileWithShortcuts2(coords, acc, shortcuts)
+      case dirTile :: dirTiles =>
+        val nextDirs = tilesAsMap(dirTile.coord).energize(dirTile.dir)
+        val nextTileCoords =
+          nextDirs.map(d => DirectedTile(d.next(dirTile.coord), d.opposite)).filter {
+            case dt =>
+              dt.coord.x >= 0 && dt.coord.x < width && dt.coord.y >= 0 && dt.coord.y < height
+          }
+        if (nextTileCoords.isEmpty) {
+          enterTileWithShortcuts2(
+            dirTiles,
+            dirTile +: acc,
+            shortcuts.put(dirTile.coord, dirTile.dir, List(dirTile))
+          )
+        } else if (nextTileCoords.forall(shortcuts.isDefinedAt)) {
+          val short = nextTileCoords.flatMap(shortcuts.get)
+          val currentEnerg = short.flatten.distinct.length
+          enterTileWithShortcuts2(
+            dirTiles,
+            (dirTile +: short.flatten) ++ acc,
+            shortcuts.put(dirTile.coord, dirTile.dir, dirTile +: short.flatten)
+          )
+        } else {
+          val short = nextTileCoords.flatMap(shortcuts.get).flatten.distinct
+          val passed = dirTile +: short
+          val next = nextTileCoords.filterNot(shortcuts.isDefinedAt)
+          enterTileWithShortcuts2(
+            next ++ dirTiles,
+            passed ++ acc,
+            shortcuts
+          )
+        }
+    }
+
   def maxEnergy: Int = {
-    val northBound = (0 until width).map(i => (Coordinate(i, 0), North))
+    val northBound = (0 until width).map(i => DirectedTile(Coordinate(i, 0), North))
     val southBound =
-      (0 until width).map(i => (Coordinate(i, height - 1), South))
-    val eastBound = (0 until height).map(i => (Coordinate(width - 1, i), East))
-    val westBound = (0 until height).map(i => (Coordinate(0, i), West))
+      (0 until width).map(i => DirectedTile(Coordinate(i, height - 1), South))
+    val eastBound = (0 until height).map(i => DirectedTile(Coordinate(width - 1, i), East))
+    val westBound = (0 until height).map(i => DirectedTile(Coordinate(0, i), West))
 
     // map!
     val allBounds = northBound ++ southBound ++ eastBound ++ westBound
@@ -76,12 +122,12 @@ final case class FloorLayout(tiles: List[List[Tile]]) {
       .foldLeft(
         (
           0,
-          Map.empty[(Coordinate, Direction), List[(Coordinate, Direction)]]
+          TileCache.empty
         )
       ) { case ((acc, shortcuts), start) =>
-        //println(s"Processing $start")
+        println(s"Processing $start")
         val (energ, shorts) =
-          enterTileWithShortcuts(
+          enterTileWithShortcuts2(
             List(start),
             List.empty,
             shortcuts
