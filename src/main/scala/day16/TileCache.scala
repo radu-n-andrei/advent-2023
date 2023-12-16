@@ -17,7 +17,7 @@ final case class TileCache(cache: Map[Coordinate, TileCacheEntry]) {
 }
 
 object TileCache {
-    val empty = TileCache(Map.empty)
+  val empty = TileCache(Map.empty)
 }
 
 final case class TileCacheEntry(entry: Map[Direction, List[DirectedTile]])
@@ -25,3 +25,5 @@ object TileCacheEntry {
   val empty = TileCacheEntry(Map.empty)
 }
 final case class DirectedTile(coord: Coordinate, dir: Direction)
+
+final case class Coordinate(x: Int, y: Int)

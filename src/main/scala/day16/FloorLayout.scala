@@ -19,102 +19,81 @@ final case class FloorLayout(tiles: List[List[Tile]]) {
 
   @tailrec
   def enterTileWithShortcuts(
-      coordinates: List[(Coordinate, Direction)],
-      acc: List[(Coordinate, Direction)],
-      shortcuts: Map[(Coordinate, Direction), List[(Coordinate, Direction)]]
-  ): (
-      Int,
-      Map[(Coordinate, Direction), List[(Coordinate, Direction)]]
-  ) =
-    coordinates match {
-      case Nil => (acc.map(_._1).distinct.length, shortcuts)
-      case c :: coords if acc.contains(c) =>
-        enterTileWithShortcuts(coords, acc, shortcuts)
-      case (coord, direction) :: coords =>
-        val nextDirs = tilesAsMap(coord).energize(direction)
-        val nextTileCoords =
-          nextDirs.map(d => (d.next(coord), d.opposite)).filter {
-            case (newCoord, _) =>
-              newCoord.x >= 0 && newCoord.x < width && newCoord.y >= 0 && newCoord.y < height
-          }
-        if (nextTileCoords.isEmpty) {
-          enterTileWithShortcuts(
-            coords,
-            (coord, direction) +: acc,
-            shortcuts + ((coord, direction) -> List((coord, direction)))
-          )
-        } else if (nextTileCoords.forall(shortcuts.isDefinedAt)) {
-          val short = nextTileCoords.flatMap(shortcuts(_))
-          val currentEnerg = 1 + short.map(_._1).distinct.length
-          enterTileWithShortcuts(
-            coords,
-            ((coord, direction) +: short) ++ acc,
-            shortcuts + ((coord, direction) -> ((coord, direction) +: short))
-          )
-        } else {
-          val short = nextTileCoords.flatMap(shortcuts.get).flatten.distinct
-          val passed = (coord, direction) +: short
-          val next = nextTileCoords.filterNot(shortcuts.isDefinedAt)
-          enterTileWithShortcuts(
-            next ++ coords,
-            passed ++ acc,
-            shortcuts
-          )
-        }
-    }
-
-  @tailrec  
-  def enterTileWithShortcuts2(
       coordinates: List[DirectedTile],
       acc: List[DirectedTile],
-      shortcuts: TileCache
+      shortcuts: TileCache,
+      exits: List[Coordinate],
+      split: Boolean
   ): (
       Int,
-      TileCache
+      TileCache,
+      List[Coordinate]
   ) =
     coordinates match {
-      case Nil => (acc.map(_.coord).distinct.length, shortcuts)
+      case Nil if split =>
+        (acc.map(_.coord).distinct.length, shortcuts, List.empty)
+      case Nil => (acc.map(_.coord).distinct.length, shortcuts, exits)
       case c :: coords if acc.contains(c) =>
-        enterTileWithShortcuts2(coords, acc, shortcuts)
+        enterTileWithShortcuts(coords, acc, shortcuts, exits, split)
       case dirTile :: dirTiles =>
         val nextDirs = tilesAsMap(dirTile.coord).energize(dirTile.dir)
+        val ttt = tilesAsMap(dirTile.coord)
+
         val nextTileCoords =
-          nextDirs.map(d => DirectedTile(d.next(dirTile.coord), d.opposite)).filter {
-            case dt =>
+          nextDirs
+            .map(d => DirectedTile(d.next(dirTile.coord), d.opposite))
+            .filter { case dt =>
               dt.coord.x >= 0 && dt.coord.x < width && dt.coord.y >= 0 && dt.coord.y < height
-          }
+            }
+        val isSplit = split || (ttt match {
+          case HorizontalSplitter
+              if dirTile.dir == North || dirTile.dir == South =>
+            true
+          case VerticalSplitter if dirTile.dir == East || dirTile.dir == West =>
+            true
+          case _ => false
+        })
         if (nextTileCoords.isEmpty) {
-          enterTileWithShortcuts2(
+          enterTileWithShortcuts(
             dirTiles,
             dirTile +: acc,
-            shortcuts.put(dirTile.coord, dirTile.dir, List(dirTile))
+            shortcuts.put(dirTile.coord, dirTile.dir, List(dirTile)),
+            dirTile.coord +: exits,
+            split
           )
         } else if (nextTileCoords.forall(shortcuts.isDefinedAt)) {
           val short = nextTileCoords.flatMap(shortcuts.get)
           val currentEnerg = short.flatten.distinct.length
-          enterTileWithShortcuts2(
+          enterTileWithShortcuts(
             dirTiles,
             (dirTile +: short.flatten) ++ acc,
-            shortcuts.put(dirTile.coord, dirTile.dir, dirTile +: short.flatten)
+            shortcuts.put(dirTile.coord, dirTile.dir, dirTile +: short.flatten),
+            exits,
+            isSplit
           )
         } else {
           val short = nextTileCoords.flatMap(shortcuts.get).flatten.distinct
           val passed = dirTile +: short
           val next = nextTileCoords.filterNot(shortcuts.isDefinedAt)
-          enterTileWithShortcuts2(
+          enterTileWithShortcuts(
             next ++ dirTiles,
             passed ++ acc,
-            shortcuts
+            shortcuts,
+            exits,
+            isSplit
           )
         }
     }
 
   def maxEnergy: Int = {
-    val northBound = (0 until width).map(i => DirectedTile(Coordinate(i, 0), North))
+    val northBound =
+      (0 until width).map(i => DirectedTile(Coordinate(i, 0), North))
     val southBound =
       (0 until width).map(i => DirectedTile(Coordinate(i, height - 1), South))
-    val eastBound = (0 until height).map(i => DirectedTile(Coordinate(width - 1, i), East))
-    val westBound = (0 until height).map(i => DirectedTile(Coordinate(0, i), West))
+    val eastBound =
+      (0 until height).map(i => DirectedTile(Coordinate(width - 1, i), East))
+    val westBound =
+      (0 until height).map(i => DirectedTile(Coordinate(0, i), West))
 
     // map!
     val allBounds = northBound ++ southBound ++ eastBound ++ westBound
@@ -122,17 +101,24 @@ final case class FloorLayout(tiles: List[List[Tile]]) {
       .foldLeft(
         (
           0,
-          TileCache.empty
+          TileCache.empty,
+          List.empty[Coordinate]
         )
-      ) { case ((acc, shortcuts), start) =>
+      ) { case ((acc, shortcuts, exploredExits), start) =>
         println(s"Processing $start")
-        val (energ, shorts) =
-          enterTileWithShortcuts2(
+        if (exploredExits.contains(start.coord)) {
+          println(s"Skipping $start")
+          (acc, shortcuts, exploredExits)
+        }
+        val (energ, shorts, exits) =
+          enterTileWithShortcuts(
             List(start),
             List.empty,
-            shortcuts
+            shortcuts,
+            List.empty,
+            false
           )
-        (Math.max(acc, energ), shorts)
+        (Math.max(acc, energ), shorts, (exits ++ exploredExits).distinct)
       }
       ._1
   }
