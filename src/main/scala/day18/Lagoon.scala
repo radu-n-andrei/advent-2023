@@ -3,6 +3,13 @@ package day18
 import java.io.FileWriter
 import java.io.File
 
+/** Naive appoach...still kinda like it, especially fo the visual.
+  * Will not work fo huge inputs, works fine for Part1 though.
+  *
+  * @param layout
+  * @param width
+  * @param height
+  */
 final case class Lagoon(
     layout: Map[Coordinate, Space],
     width: Int,
@@ -24,11 +31,11 @@ final case class Lagoon(
     (0 to height).foreach { y =>
       fileWriter.write((0 to width).map { x =>
         layout(Coordinate(x, y)) match {
-          case Trench(Up) => '^'
+          case Trench(Up)    => '^'
           case Trench(Right) => '>'
-          case Trench(Left) => '<'
-          case Trench(Down) => 'v'
-          case Ground    => '.'
+          case Trench(Left)  => '<'
+          case Trench(Down)  => 'v'
+          case Ground        => '.'
         }
       }.mkString + "\n")
 
@@ -39,14 +46,17 @@ final case class Lagoon(
   def fill: Lagoon = {
 
     def connectedDir(dirCoord: DirectedCoordinate): List[Direction] = {
-       List(Right, Left, Up, Down)
+      List(Right, Left, Up, Down)
         .map(d =>
           d.move(dirCoord.coordinate, 1)
             .filter(c => c.x >= 0 && c.y >= 0 && c.x <= width && c.y <= height)
-        ).filterNot(_.isEmpty).map(l => layout(l.head)).collect {
-            case Trench(direction) => direction
+        )
+        .filterNot(_.isEmpty)
+        .map(l => layout(l.head))
+        .collect { case Trench(direction) =>
+          direction
         }
-        
+
     }
 
     def fillRow(
@@ -76,9 +86,9 @@ final case class Lagoon(
             )
           case Ground =>
             val nextInside = prevTrenchDirections.size match {
-                case 0 => inside
-                case 1 | 2 => !inside
-                case _ => inside
+              case 0     => inside
+              case 1 | 2 => !inside
+              case _     => inside
             }
             val newAcc =
               if (nextInside)
