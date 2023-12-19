@@ -4,24 +4,25 @@ final case class Rule(name: String, conditions: List[Condition]) {
 
   def evaluateRange(partPossibilities: PartPossibilities): RuleOutcome = {
 
+    val condMap = conditions.sliding(2, 1).map(lc => lc(0) -> lc(1)).toMap
+
     def goThrough(
         buffer: List[RangedCondition],
         toJump: List[RangedRule],
-        solutions: List[PartPossibilities],
-        conditionList: List[Condition]
+        solutions: List[PartPossibilities]
     ): RuleOutcome = {
       buffer match {
         case Nil => RuleOutcome(solutions, toJump)
         case cond :: conds =>
           val condOutcome = cond.evaluate
-          val further = conditionList.headOption
+          val further = condMap
+            .get(cond.condition)
             .map(h => condOutcome.checkFurther.map(p => RangedCondition(h, p)))
             .getOrElse(List.empty)
           goThrough(
             conds ++ further,
             toJump ++ condOutcome.jump,
-            condOutcome.solution.fold(solutions)(s => solutions :+ s),
-            if (conditionList.isEmpty) List.empty else conditionList.tail
+            condOutcome.solution.fold(solutions)(s => solutions :+ s)
           )
       }
     }
@@ -29,8 +30,7 @@ final case class Rule(name: String, conditions: List[Condition]) {
     goThrough(
       List(RangedCondition(conditions.head, partPossibilities)),
       List.empty,
-      List.empty,
-      conditions.tail
+      List.empty
     )
   }
 }
