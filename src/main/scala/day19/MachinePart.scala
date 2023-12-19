@@ -38,3 +38,44 @@ object PartCharacteristic {
     }
   }
 }
+
+case class Range(min: Int, max: Int) {
+
+  /** Intersects this range with another
+    * @param other
+    *   the range to intersect with
+    * @return
+    *   the common range
+    */
+  def intersection(other: Range): Option[Range] = {
+    val minCommon = Math.max(min, other.min)
+    val maxCommon = Math.min(max, other.max)
+    if (maxCommon < minCommon) None
+    else Some(Range(minCommon, maxCommon))
+  }
+
+  def diff(other: Range): List[Range] =
+    intersection(other).fold(List(Range(min, max))) { i =>
+      List(Range(min, i.min - 1), Range(i.max + 1, max)).filterNot(r => r.min >= r.max)
+
+    }
+
+}
+
+case class PartPossibilities(parts: Map[PartCharacteristic, Range]) {
+  def updateWith(part: PartCharacteristic, range: Range): PartPossibilities = {
+    PartPossibilities(parts + (part -> range))
+  }
+
+  def total: BigInt = {
+    parts.values.map(r => BigInt(r.max - r.min + 1)).product
+  }
+}
+object PartPossibilities {
+  val initial: PartPossibilities = PartPossibilities(Map(
+    X -> Range(1, 4000),
+    M -> Range(1, 4000),
+    A -> Range(1, 4000),
+    S -> Range(1, 4000)
+  ))
+}

@@ -2,7 +2,7 @@ package day19
 
 object PartSorter {
 
-  val startingRuleName = "in"  
+  val startingRuleName = "in"
 
   def sortParts(parts: List[MachinePart], rules: List[Rule]): Unit = {
     val ruleMap = rules.groupBy(_.name).view.mapValues(_.head).toMap
@@ -29,6 +29,29 @@ object PartSorter {
       }
     )
     println(s"SOL1: ${accepted.map(_.score).sum}")
+  }
+
+  def possibilities(rules: List[Rule]): Unit = {
+    val ruleMap = rules.groupBy(_.name).view.mapValues(_.head).toMap
+    val start = RangedRule(startingRuleName, PartPossibilities.initial)
+    // ruleMap(startingRuleName).evaluateRange(PartPossibilities.initial).print
+
+    def process(
+        toCheck: List[RangedRule],
+        solutions: List[PartPossibilities]
+    ): List[PartPossibilities] = {
+      toCheck match {
+        case Nil => solutions
+        case check :: checks =>
+          val processed =
+            ruleMap(check.rule).evaluateRange(check.partPossibilities)
+          process(checks ++ processed.toJump, solutions ++ processed.solutions)
+      }
+    }
+
+    println(
+      s"SOL2: ${process(List(start), List.empty).map(_.total).reduce((_ + _))}"
+    )
   }
 
 }
