@@ -31,7 +31,7 @@ final case class BrickWall(bricks: List[Brick]) {
           )
         case b :: bs if b.brick.canSupport(brick) =>
           val droppedBrick =
-              brick.moveByZ(brick.lowestPoint - b.brick.highestPoint - 1)
+            brick.moveByZ(brick.lowestPoint - b.brick.highestPoint - 1)
           val allValidSupports = bs.filter(sb =>
             sb.brick.highestPoint == b.brick.highestPoint && sb.brick
               .canSupport(brick)
@@ -50,7 +50,11 @@ final case class BrickWall(bricks: List[Brick]) {
     )
     val supportMap = l.map(sb => sb.brick -> sb.supports).toMap
     val supportedMap =
-      l.map(sb => sb.brick -> l.filter(sup => sup.supports.contains(sb.brick)).map(_.brick)).toMap
+      l.map(sb =>
+        sb.brick -> l
+          .filter(sup => sup.supports.contains(sb.brick))
+          .map(_.brick)
+      ).toMap
 
     val procOrder = l.sortBy(_.brick)(Brick.lowZorderingD)
 
@@ -60,28 +64,28 @@ final case class BrickWall(bricks: List[Brick]) {
     ): Unit = {
       bricks match {
         case Nil => println(s"SOL2: ${total}")
-        case b :: bs => 
-            val curentChain = singleChain(List(b), List.empty)
-            chain(bs,  curentChain + total)
+        case b :: bs =>
+          val curentChain = singleChain(List(b), List.empty)
+          chain(bs, curentChain + total)
       }
     }
 
     def singleChain(cascade: List[Brick], destroyed: List[Brick]): Int = {
-        cascade match {
-            case Nil => 
-                destroyed.length - 1 //remove the start
-            case cs => 
-                // bricks supported by current brick
-                val affected = cs.flatMap(supportMap(_)).distinct
-                // bricks supported by current
-                val dest = affected.filter(
-                    maybe => supportedMap(maybe).diff(destroyed ++ cascade).isEmpty
-                )
-                singleChain(dest, destroyed ++ cascade)
-        }
+      cascade match {
+        case Nil =>
+          destroyed.length - 1 // remove the start
+        case cs =>
+          // bricks supported by current brick
+          val affected = cs.flatMap(supportMap(_)).distinct
+          // bricks supported by current
+          val dest = affected.filter(maybe =>
+            supportedMap(maybe).diff(destroyed ++ cascade).isEmpty
+          )
+          singleChain(dest, destroyed ++ cascade)
+      }
     }
 
     chain(l.map(_.brick).sorted, 0)
-    
+
   }
 }
