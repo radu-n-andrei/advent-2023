@@ -2,6 +2,7 @@ package common
 
 sealed trait Direction {
     def move(coord: Coordinate, steps: Int): List[Coordinate]
+    def moveOne(coord: Coordinate): Coordinate = move(coord, 1).head
     def jump(coord: Coordinate, steps: Int): Coordinate
     val opposite: Direction
 }
@@ -49,4 +50,6 @@ object Direction {
             case 'W' => West
             case _ => throw new RuntimeException(s"Illegal direction $c")
         }
+
+    val all = List(North, South, East, West)    
 }
