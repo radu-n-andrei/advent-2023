@@ -9,7 +9,6 @@ object LongWalk {
         val input = file.getLines().toList
         val layout = Layout(input)
         //layout.longestPath
-        //layout.desloped.print
         layout.desloped.longestPath
         file.close
     }

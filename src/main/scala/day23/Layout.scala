@@ -27,81 +27,82 @@ final case class Layout(tiles: Map[Coordinate, Tile], width: Int, height: Int) {
     tiles.filter(e => e._1.y == height - 1 && Tile.walkable(e._2)).head._1
 
   def longestPath: Unit = {
-    val longestPathTo = tiles
-      .filter(x => Tile.walkable(x._2))
-      .map(e => e._1 -> List.empty[Coordinate])
-      .toMap
-    val updatedPaths = longestPathTo + (start -> List(start))
 
-    def walkAround(
-        coord: Coordinate,
-        paths: Map[Coordinate, List[Coordinate]],
-        unvisited: List[Coordinate],
-        currentMax: Int
-    ): Int = {
-      if (coord == end) {
-        println(
-          s"Reached  end with len ${paths(coord).length}. Unvisited len: ${unvisited.length}"
-        )
-        scala.io.StdIn.readLine()
-        if (unvisited.length == 1) {
-          printSolution(paths(end))
-          paths(coord).length - 1
-        } else {
-          val updatedUnvisited = unvisited.filterNot(_ == coord)
-          val nextUp = (paths - coord)
-            .filter(c => updatedUnvisited.contains(c._1))
-            .maxBy(_._2.length)
-            ._1
-          walkAround(nextUp, paths, updatedUnvisited, paths(coord).length - 1)
+    def explore(
+        tile: UnvisitedTile,
+        toVisit: List[UnvisitedTile],
+        solutions: List[Solution]
+    ): Unit = {
+
+      // maybe here?
+      val (tunneled, standardMoves) = tunnelVision(tile)
+
+      if (tunneled.coord == end) {
+        println(s"FOUND ONE: ${tunneled.path.length - 1}")
+        if (toVisit.isEmpty)
+          println(
+            s"SOL: ${(solutions :+ Solution(tunneled.path)).map(_.tiles.keySet.size).max - 1}"
+          )
+        else {
+          val nextUp = toVisit.maxBy(_.path.length)
+          explore(
+            nextUp,
+            toVisit.filterNot(_ == nextUp),
+            solutions :+ Solution(tunneled.path)
+          )
         }
       } else {
-        println(s"AT $coord")
-        printSolution(paths(coord))
-        println(unvisited)
-        scala.io.StdIn.readLine()
-
-        val currentPath = paths(coord)
-        val moves = tiles(coord)
-          .moves(coord)
-          .filter(c =>
-            c._2.x >= 0 && c._2.y >= 0 && c._2.x < width && c._2.y < height
-              && tiles(c._2).reachableFrom(c._1)
-              && !currentPath
-                .contains(c._2)
+        val potentialSolutions = solutions.flatMap(_.buildUp(tunneled.path, tunneled.coord))
+        if (potentialSolutions.nonEmpty) {
+          println(
+            s"Adding ${potentialSolutions.length} new solutions on top of existing ${solutions.length}. Current max: ${(potentialSolutions ++ solutions).map(_.tiles.keySet.size).max}"
           )
-          .map(_._2)
-        val (updatedPaths, toCheck) =
-          moves.foldLeft((paths, List.empty[Coordinate])) { case (p, m) =>
-            if (paths(m).length < currentPath.length + 1)
-              (p._1 + (m -> (currentPath :+ m)), p._2 :+ m)
-            else p
-          }
+          println(s"\tLeft to check: ${toVisit.length}")
+        }
+        val exhausted = potentialSolutions.map { s =>
+          val ind = s.tiles(tunneled.coord)
+          s.tiles.filter(_._2 == ind + 1).head._1
+        }
+        val moves = standardMoves.filter(c => !exhausted.contains(c))
 
-        val unvisitedPart = unvisited.partition(_ == coord)
-        val updatedUnvisited =
-          unvisitedPart._1.drop(1) ++ unvisitedPart._2 ++ toCheck
-        val finalPaths =
-          if (toCheck.isEmpty)
-            updatedPaths + (coord -> List.empty)
-          else updatedPaths
-        val nextUpCandidates = finalPaths
-          .filter(c => updatedUnvisited.contains(c._1))
-
-        if (nextUpCandidates.isEmpty) {
-          printSolution(paths(end))
-          currentMax
-        } else
-          walkAround(
-            nextUpCandidates.maxBy(_._2.length)._1,
-            finalPaths,
-            updatedUnvisited,
-            currentMax
+        val unvisited =
+          moves.map(c => UnvisitedTile(c, tunneled.path :+ c)).toList
+        val nextVisits = unvisited ++ toVisit
+        if (nextVisits.isEmpty)
+          println(
+            s"From ${solutions.length} solutions we get: ${solutions.map(_.tiles.keySet.size).max - 1}"
           )
+        else {
+          val nextUp = nextVisits.maxBy(_.path.length)
+          explore(
+            nextUp,
+            nextVisits.filterNot(_ == nextUp),
+            solutions ++ potentialSolutions//.filter(s => solutions.forall(sol => sol.tiles.length <= s.tiles.length))
+
+          )
+        }
+
       }
     }
 
-    println(s"SOL1: ${walkAround(start, updatedPaths, List.empty, 0)}")
+    def tunnelVision(tile: UnvisitedTile): (UnvisitedTile, List[Coordinate]) = {
+      val moves = tiles(tile.coord)
+        .moves(tile.coord)
+        .filter(c =>
+          c._2.x >= 0 && c._2.y >= 0 && c._2.x < width && c._2.y < height
+            && tiles(c._2).reachableFrom(c._1) && !tile.path
+              .contains(c._2)
+        )
+        .map(_._2)
+        .toList
+
+      if (moves.length == 1) {
+        tunnelVision(UnvisitedTile(moves.head, tile.path :+ moves.head))
+      } else {
+        (tile, moves)
+      }
+    }
+    explore(UnvisitedTile(start, List(start)), List.empty, List.empty)
   }
 
   def desloped: Layout = {
@@ -123,4 +124,25 @@ object Layout {
       input.headOption.fold(0)(_.length()),
       input.length
     )
+}
+
+case class UnvisitedTile(coord: Coordinate, path: List[Coordinate])
+
+case class Solution(tiles: Map[Coordinate, Int]) {
+
+  def buildUp(path: List[Coordinate], head: Coordinate): Option[Solution] = {
+    tiles.get(head).flatMap{
+      i => 
+        val newPath = path ++ tiles.filter(_._2 > i).map(_._1)
+        if(newPath.distinct.length < newPath.length) None
+        else Some(Solution(newPath))
+    }
+  }
+}
+
+object Solution {
+  def apply(tiles: List[Coordinate]): Solution = {
+    val m = tiles.zipWithIndex.map(c => c._1 -> c._2).toMap
+    Solution(m)
+  }
 }
