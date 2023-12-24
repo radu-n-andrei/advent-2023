@@ -8,7 +8,7 @@ object LongWalk {
         val file = Source.fromResource("day23.input")
         val input = file.getLines().toList
         val layout = Layout(input)
-        //layout.longestPath
+        layout.longestPath
         layout.desloped.longestPath
         file.close
     }

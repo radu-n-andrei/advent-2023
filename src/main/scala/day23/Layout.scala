@@ -1,6 +1,9 @@
 package day23
 
 import common.Coordinate
+import common.North
+import scala.concurrent.duration.fromNow
+import scala.annotation.tailrec
 
 final case class Layout(tiles: Map[Coordinate, Tile], width: Int, height: Int) {
 
@@ -26,65 +29,11 @@ final case class Layout(tiles: Map[Coordinate, Tile], width: Int, height: Int) {
   val end: Coordinate =
     tiles.filter(e => e._1.y == height - 1 && Tile.walkable(e._2)).head._1
 
+  val preEnd: Coordinate = North.moveOne(end)
+
   def longestPath: Unit = {
 
-    def explore(
-        tile: UnvisitedTile,
-        toVisit: List[UnvisitedTile],
-        solutions: List[Solution]
-    ): Unit = {
-
-      // maybe here?
-      val (tunneled, standardMoves) = tunnelVision(tile)
-
-      if (tunneled.coord == end) {
-        println(s"FOUND ONE: ${tunneled.path.length - 1}")
-        if (toVisit.isEmpty)
-          println(
-            s"SOL: ${(solutions :+ Solution(tunneled.path)).map(_.tiles.keySet.size).max - 1}"
-          )
-        else {
-          val nextUp = toVisit.maxBy(_.path.length)
-          explore(
-            nextUp,
-            toVisit.filterNot(_ == nextUp),
-            solutions :+ Solution(tunneled.path)
-          )
-        }
-      } else {
-        val potentialSolutions = solutions.flatMap(_.buildUp(tunneled.path, tunneled.coord))
-        if (potentialSolutions.nonEmpty) {
-          println(
-            s"Adding ${potentialSolutions.length} new solutions on top of existing ${solutions.length}. Current max: ${(potentialSolutions ++ solutions).map(_.tiles.keySet.size).max}"
-          )
-          println(s"\tLeft to check: ${toVisit.length}")
-        }
-        val exhausted = potentialSolutions.map { s =>
-          val ind = s.tiles(tunneled.coord)
-          s.tiles.filter(_._2 == ind + 1).head._1
-        }
-        val moves = standardMoves.filter(c => !exhausted.contains(c))
-
-        val unvisited =
-          moves.map(c => UnvisitedTile(c, tunneled.path :+ c)).toList
-        val nextVisits = unvisited ++ toVisit
-        if (nextVisits.isEmpty)
-          println(
-            s"From ${solutions.length} solutions we get: ${solutions.map(_.tiles.keySet.size).max - 1}"
-          )
-        else {
-          val nextUp = nextVisits.maxBy(_.path.length)
-          explore(
-            nextUp,
-            nextVisits.filterNot(_ == nextUp),
-            solutions ++ potentialSolutions//.filter(s => solutions.forall(sol => sol.tiles.length <= s.tiles.length))
-
-          )
-        }
-
-      }
-    }
-
+    @tailrec
     def tunnelVision(tile: UnvisitedTile): (UnvisitedTile, List[Coordinate]) = {
       val moves = tiles(tile.coord)
         .moves(tile.coord)
@@ -97,12 +46,78 @@ final case class Layout(tiles: Map[Coordinate, Tile], width: Int, height: Int) {
         .toList
 
       if (moves.length == 1) {
-        tunnelVision(UnvisitedTile(moves.head, tile.path :+ moves.head))
+        tunnelVision(
+          UnvisitedTile(moves.head, tile.path :+ moves.head, tile.junctions)
+        )
       } else {
-        (tile, moves)
+        if(tile.coord == end)
+          (tile, moves)
+        else  
+          (tile.copy(junctions = tile.junctions :+ tile.coord), moves)
       }
     }
-    explore(UnvisitedTile(start, List(start)), List.empty, List.empty)
+    @tailrec
+    def explore(
+        tile: UnvisitedTile,
+        toVisit: List[UnvisitedTile],
+        solution: JunctionSolution
+    ): Unit = {
+
+      // maybe here?
+      val (tunneled, standardMoves) = tunnelVision(tile)
+
+      if (tunneled.coord == end) {
+        if (toVisit.isEmpty)
+          println(
+            s"SOL: ${solution.withSolution(tunneled).currentMax - 1}"
+          )
+        else {
+          val nextUp = toVisit.maxBy(_.path.length)
+          
+          explore(
+            nextUp,
+            toVisit.filterNot(_ == nextUp),
+            solution.withSolution(tunneled)
+          )
+        }
+      } else {
+        val potentialSolutions = solution.append(tunneled)
+        val exhausted = potentialSolutions.map(_._2).getOrElse(List.empty)
+        val moves = standardMoves.filter(c => !exhausted.contains(c))
+
+        val unvisited =
+          moves
+            .map(c =>
+              UnvisitedTile(
+                c,
+                tunneled.path :+ c,
+                tunneled.junctions
+              )
+            )
+            .toList
+        val nextVisits = unvisited ++ toVisit
+        if (nextVisits.isEmpty)
+          println(
+            s"Sol: ${solution.currentMax - 1}"
+          )
+        else {
+          val nextUp = nextVisits.maxBy(_.path.length)
+          explore(
+            nextUp,
+            nextVisits.filterNot(_ == nextUp),
+            potentialSolutions.map(_._1).getOrElse(solution)
+          )
+        }
+
+      }
+
+    }
+
+    explore(
+      UnvisitedTile(start, List(start), List.empty),
+      List.empty,
+      JunctionSolution.empty
+    )
   }
 
   def desloped: Layout = {
@@ -126,23 +141,24 @@ object Layout {
     )
 }
 
-case class UnvisitedTile(coord: Coordinate, path: List[Coordinate])
+case class UnvisitedTile(
+    coord: Coordinate,
+    path: List[Coordinate],
+    junctions: List[Coordinate]
+)
 
-case class Solution(tiles: Map[Coordinate, Int]) {
+case class Solution(tiles: List[Coordinate]) {
+
+  val length: Int = tiles.length
 
   def buildUp(path: List[Coordinate], head: Coordinate): Option[Solution] = {
-    tiles.get(head).flatMap{
-      i => 
-        val newPath = path ++ tiles.filter(_._2 > i).map(_._1)
-        if(newPath.distinct.length < newPath.length) None
-        else Some(Solution(newPath))
+    val ind = tiles.indexOf(head)
+    if (ind < 0) None
+    else {
+      val newPath = path ++ tiles.drop(ind + 1)
+      if (newPath.distinct.length < newPath.length) None
+      else Some(Solution(newPath))
     }
   }
 }
 
-object Solution {
-  def apply(tiles: List[Coordinate]): Solution = {
-    val m = tiles.zipWithIndex.map(c => c._1 -> c._2).toMap
-    Solution(m)
-  }
-}
