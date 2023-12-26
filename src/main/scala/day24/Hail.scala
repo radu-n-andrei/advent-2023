@@ -47,6 +47,12 @@ final case class Hail(startCoord: Coordinate3d, velocity: Velocity) {
       (positionAtT(interval.start), positionAtT(interval.end))
     }
 
+  def inTheFuture(fx: Double, fy: Double): Boolean = {
+    val deltaX = fx - startCoord.x 
+    val deltaY = fy - startCoord.y
+    Math.signum(deltaX) == Math.signum(velocity.vx) && Math.signum(deltaY) == Math.signum(velocity.vy)
+  }  
+
 }
 
 object Hail {
@@ -56,7 +62,7 @@ object Hail {
     s match {
       case pat(x, y, z, vx, vy, vz) =>
         Hail(
-          Coordinate3d(x.toLong, y.toLong, z.toLong),
+          Coordinate3d(x.toLong.toDouble, y.toLong.toDouble, z.toLong.toDouble),
           Velocity(
             Velocity.fromString(vx),
             Velocity.fromString(vy),
