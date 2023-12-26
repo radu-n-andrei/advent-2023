@@ -17,10 +17,10 @@ case class JunctionSolution(
 
   def withSolution(tile: UnvisitedTile): JunctionSolution = {
     val simplified =
-      readJunctions(tile.junctions, tile.path, List.empty, 0, List.empty)
+      readJunctions(tile.junctions, tile.path, List.empty, 0, List.empty, true)
     val updatedMap = simplified.foldLeft(solutions) { case (m, s) =>
       m + (s.head -> m.get(s.head).fold(List(s))(ex => ex :+ s))
-    }
+    } 
     val newMax = Math.max(tile.path.length, currentMax)
     JunctionSolution(
       updatedMap,
@@ -34,13 +34,15 @@ case class JunctionSolution(
     solutions.get(tile.coord).map { sols =>
       val potential =
         sols.filter(s => s.junctions.intersect(tile.junctions).isEmpty)
+        
       val newEntries = potential.flatMap { pot =>
         val js = readJunctions(
           tile.junctions,
           tile.path,
           List.empty,
           pot.length,
-          pot.junctions
+          pot.junctions,
+          false
         )
         js.map(j => j.head -> j)
       }
@@ -50,7 +52,11 @@ case class JunctionSolution(
           .fold(List(e._2))(existing => existing :+ e._2))
       }
       // found a valid solution
-      if (potential.nonEmpty)
+      if (potential.nonEmpty) {
+        println(s"New sol: ${Math.max(
+              potential.map(_.length).max + tile.path.length,
+              currentMax
+            )}")
         (
           JunctionSolution(
             updatedSolution,
@@ -61,6 +67,7 @@ case class JunctionSolution(
           ),
           potential.map(_.goingThrough).distinct
         )
+      }
       // found a cyclical solution, don't update - continue exploring   
       else (JunctionSolution(solutions, currentMax), List.empty)
     }
@@ -72,11 +79,12 @@ case class JunctionSolution(
       path: List[Coordinate],
       simplified: List[SimplifiedPath],
       addedLength: Int,
-      addedJunctions: List[Coordinate]
+      addedJunctions: List[Coordinate],
+      fullSolution: Boolean
   ): List[SimplifiedPath] =
     junctions match {
       case Nil      => simplified
-      case _ :: Nil => simplified
+      case _ :: Nil if !fullSolution => simplified
       case j :: js =>
         val fromHere = path.dropWhile(_ != j).tail
         readJunctions(
@@ -89,7 +97,8 @@ case class JunctionSolution(
             fromHere.head
           ),
           addedLength,
-          addedJunctions
+          addedJunctions,
+          fullSolution
         )
     }
 

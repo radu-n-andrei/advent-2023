@@ -17,7 +17,9 @@ final case class Layout(tiles: Map[Coordinate, Tile], width: Int, height: Int) {
       println(
         (0 until width)
           .map(x =>
-            if (coords.contains(Coordinate(x, y))) 'O'
+            if (coords.contains(Coordinate(x, y)))
+              if(coords.last == Coordinate(x,y)) 'S'
+              else '0'
             else tiles(Coordinate(x, y)).symbol
           )
           .mkString
@@ -39,21 +41,28 @@ final case class Layout(tiles: Map[Coordinate, Tile], width: Int, height: Int) {
         .moves(tile.coord)
         .filter(c =>
           c._2.x >= 0 && c._2.y >= 0 && c._2.x < width && c._2.y < height
-            && tiles(c._2).reachableFrom(c._1) && !tile.path
-              .contains(c._2)
+            && tiles(c._2).reachableFrom(c._1)
         )
         .map(_._2)
         .toList
-
-      if (moves.length == 1) {
+      val validMoves = moves.filter(c =>
+        !tile.path
+          .contains(c)
+      )
+      if (validMoves.length == 1) {
+        val junc = if(moves.length > 2) tile.junctions :+ tile.coord else tile.junctions
         tunnelVision(
-          UnvisitedTile(moves.head, tile.path :+ moves.head, tile.junctions)
+          UnvisitedTile(
+            validMoves.head,
+            tile.path :+ validMoves.head,
+            junc
+          )
         )
       } else {
-        if(tile.coord == end)
-          (tile, moves)
-        else  
-          (tile.copy(junctions = tile.junctions :+ tile.coord), moves)
+        if (tile.coord == end)
+          (tile, validMoves)
+        else
+          (tile.copy(junctions = tile.junctions :+ tile.coord), validMoves)
       }
     }
     @tailrec
@@ -65,7 +74,7 @@ final case class Layout(tiles: Map[Coordinate, Tile], width: Int, height: Int) {
 
       // maybe here?
       val (tunneled, standardMoves) = tunnelVision(tile)
-
+     
       if (tunneled.coord == end) {
         if (toVisit.isEmpty)
           println(
@@ -73,7 +82,7 @@ final case class Layout(tiles: Map[Coordinate, Tile], width: Int, height: Int) {
           )
         else {
           val nextUp = toVisit.maxBy(_.path.length)
-          
+
           explore(
             nextUp,
             toVisit.filterNot(_ == nextUp),
@@ -84,7 +93,10 @@ final case class Layout(tiles: Map[Coordinate, Tile], width: Int, height: Int) {
         val potentialSolutions = solution.append(tunneled)
         val exhausted = potentialSolutions.map(_._2).getOrElse(List.empty)
         val moves = standardMoves.filter(c => !exhausted.contains(c))
-
+        if(exhausted.nonEmpty) {
+          println(s"Dropping off from $standardMoves to $moves")
+        }
+       
         val unvisited =
           moves
             .map(c =>
@@ -161,4 +173,3 @@ case class Solution(tiles: List[Coordinate]) {
     }
   }
 }
-
