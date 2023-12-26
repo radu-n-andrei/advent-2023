@@ -42,16 +42,17 @@ final case class Hail(startCoord: Coordinate3d, velocity: Velocity) {
   def edgesAtBounds2D(
       lowerBound: Long,
       upperBound: Long
-  ): Option[(Coordinate3d, Coordinate3d)] = 
+  ): Option[(Coordinate3d, Coordinate3d)] =
     timeInBounds2D(lowerBound, upperBound).map { interval =>
       (positionAtT(interval.start), positionAtT(interval.end))
     }
 
   def inTheFuture(fx: Double, fy: Double): Boolean = {
-    val deltaX = fx - startCoord.x 
+    val deltaX = fx - startCoord.x
     val deltaY = fy - startCoord.y
-    Math.signum(deltaX) == Math.signum(velocity.vx) && Math.signum(deltaY) == Math.signum(velocity.vy)
-  }  
+    (fx == startCoord.x && fy == startCoord.y) || (Math.signum(deltaX) == Math
+      .signum(velocity.vx) && Math.signum(deltaY) == Math.signum(velocity.vy))
+  }
 
 }
 

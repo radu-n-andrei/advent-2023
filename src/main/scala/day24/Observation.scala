@@ -17,21 +17,32 @@ final case class Observation(
         endB: Coordinate3d // 4
     ): Boolean = {
       val d: Double =
-        ((hailA.startCoord.x - endA.x) * (hailB.startCoord.y - endB.y) - 
-        (hailA.startCoord.y - endA.y) * (hailB.startCoord.x - endB.x))
+        ((hailA.startCoord.x - endA.x) * (hailB.startCoord.y - endB.y) -
+          (hailA.startCoord.y - endA.y) * (hailB.startCoord.x - endB.x))
+      lazy val t =
+        (hailA.startCoord.x - hailB.startCoord.x) * (hailB.startCoord.y - endB.y) -
+          (hailA.startCoord.y - hailB.startCoord.y) * (hailB.startCoord.x - endB.x)
+      lazy val u =
+        (hailA.startCoord.x - hailB.startCoord.x) * (hailA.startCoord.y - endA.y) -
+          (hailA.startCoord.y - hailB.startCoord.y) * (hailA.startCoord.x - endA.x)
       lazy val px: Double =
-        (hailA.startCoord.x * endA.y - hailA.startCoord.y * endA.x) * (hailB.startCoord.x - endB.x) - 
-        (hailA.startCoord.x - endA.x) * (hailB.startCoord.x * endB.y - hailB.startCoord.y * endB.x)
+        (hailA.startCoord.x * endA.y - hailA.startCoord.y * endA.x) * (hailB.startCoord.x - endB.x) -
+          (hailA.startCoord.x - endA.x) * (hailB.startCoord.x * endB.y - hailB.startCoord.y * endB.x)
       lazy val py: Double =
-        (hailA.startCoord.x * endA.y - hailA.startCoord.y * endA.x) * (hailB.startCoord.y - endB.y) - 
-        (hailA.startCoord.y - endA.y) * (hailB.startCoord.x * endB.y - hailB.startCoord.y * endB.x)
+        (hailA.startCoord.x * endA.y - hailA.startCoord.y * endA.x) * (hailB.startCoord.y - endB.y) -
+          (hailA.startCoord.y - endA.y) * (hailB.startCoord.x * endB.y - hailB.startCoord.y * endB.x)
 
-      if (d == 0) false // parallel
+      if (d == 0) {
+        false
+      } // parallel
       else {
-        val x = px / d
-        val y = py / d
-        x >= lowerBound && x <= upperBound && y >= lowerBound && y <= upperBound && hailA
-          .inTheFuture(x, y) && hailB.inTheFuture(x, y)
+        if (t / d < 0 || u / d < 0) false
+        else {
+          val t0 = t/d
+          val x = hailA.startCoord.x + t0 * (endA.x - hailA.startCoord.x)
+          val y = hailA.startCoord.y + t0 * (endA.y - hailA.startCoord.y)
+          x >= lowerBound && x <= upperBound && y >= lowerBound && y <= upperBound
+        }
       }
     }
 
