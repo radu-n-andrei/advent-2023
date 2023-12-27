@@ -51,5 +51,5 @@ object Direction {
             case _ => throw new RuntimeException(s"Illegal direction $c")
         }
 
-    val all = List(North, South, East, West)    
+    val all = List(South, North, East, West)    
 }

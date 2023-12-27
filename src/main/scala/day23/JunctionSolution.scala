@@ -34,7 +34,7 @@ case class JunctionSolution(
     solutions.get(tile.coord).map { sols =>
       val potential =
         sols.filter(s => s.junctions.intersect(tile.junctions).isEmpty)
-        
+
       val newEntries = potential.flatMap { pot =>
         val js = readJunctions(
           tile.junctions,
@@ -51,12 +51,9 @@ case class JunctionSolution(
           .get(e._1)
           .fold(List(e._2))(existing => existing :+ e._2))
       }
+      
       // found a valid solution
       if (potential.nonEmpty) {
-        println(s"New sol: ${Math.max(
-              potential.map(_.length).max + tile.path.length,
-              currentMax
-            )}")
         (
           JunctionSolution(
             updatedSolution,
@@ -65,11 +62,11 @@ case class JunctionSolution(
               currentMax
             )
           ),
-          potential.map(_.goingThrough).distinct
+          sols.map(_.goingThrough).distinct
         )
       }
       // found a cyclical solution, don't update - continue exploring   
-      else (JunctionSolution(solutions, currentMax), List.empty)
+      else (JunctionSolution(solutions, currentMax), sols.map(_.goingThrough).distinct)
     }
   }
 

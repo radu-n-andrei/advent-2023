@@ -49,8 +49,10 @@ final case class Layout(tiles: Map[Coordinate, Tile], width: Int, height: Int) {
         !tile.path
           .contains(c)
       )
+      val junc = if(moves.length > 2) tile.junctions :+ tile.coord else tile.junctions
       if (validMoves.length == 1) {
-        val junc = if(moves.length > 2) tile.junctions :+ tile.coord else tile.junctions
+        printSolution(tile.path :+ validMoves.head)
+        scala.io.StdIn.readLine()
         tunnelVision(
           UnvisitedTile(
             validMoves.head,
@@ -62,7 +64,7 @@ final case class Layout(tiles: Map[Coordinate, Tile], width: Int, height: Int) {
         if (tile.coord == end)
           (tile, validMoves)
         else
-          (tile.copy(junctions = tile.junctions :+ tile.coord), validMoves)
+          (tile.copy(junctions = junc), validMoves)
       }
     }
     @tailrec
@@ -71,7 +73,6 @@ final case class Layout(tiles: Map[Coordinate, Tile], width: Int, height: Int) {
         toVisit: List[UnvisitedTile],
         solution: JunctionSolution
     ): Unit = {
-
       // maybe here?
       val (tunneled, standardMoves) = tunnelVision(tile)
      
@@ -82,7 +83,9 @@ final case class Layout(tiles: Map[Coordinate, Tile], width: Int, height: Int) {
           )
         else {
           val nextUp = toVisit.maxBy(_.path.length)
-
+          println("SOLUTION")
+          printSolution(tunneled.path)
+          scala.io.StdIn.readLine()
           explore(
             nextUp,
             toVisit.filterNot(_ == nextUp),
@@ -92,11 +95,8 @@ final case class Layout(tiles: Map[Coordinate, Tile], width: Int, height: Int) {
       } else {
         val potentialSolutions = solution.append(tunneled)
         val exhausted = potentialSolutions.map(_._2).getOrElse(List.empty)
+        
         val moves = standardMoves.filter(c => !exhausted.contains(c))
-        if(exhausted.nonEmpty) {
-          println(s"Dropping off from $standardMoves to $moves")
-        }
-       
         val unvisited =
           moves
             .map(c =>
@@ -106,14 +106,20 @@ final case class Layout(tiles: Map[Coordinate, Tile], width: Int, height: Int) {
                 tunneled.junctions
               )
             )
-            .toList
+        println(s"Adding: ${unvisited.map(_.coord)}")    
+        potentialSolutions.map(_._1).getOrElse(solution).solutions.foreach {
+          println
+        }
         val nextVisits = unvisited ++ toVisit
-        if (nextVisits.isEmpty)
+        if (nextVisits.isEmpty) {
           println(
-            s"Sol: ${solution.currentMax - 1}"
+            s"Sol: ${potentialSolutions.map(_._1).getOrElse(solution).currentMax - 1}"
           )
+        }
         else {
           val nextUp = nextVisits.maxBy(_.path.length)
+          println(s"NEXT: ${nextUp.coord} - ${nextUp.path.length}; left: ${nextVisits.filterNot(_ == nextUp).map(_.coord)}")
+          scala.io.StdIn.readLine()
           explore(
             nextUp,
             nextVisits.filterNot(_ == nextUp),
@@ -148,7 +154,7 @@ object Layout {
       input.zipWithIndex.flatMap { in =>
         in._1.zipWithIndex.map(c => (Coordinate(c._2, in._2) -> Tile(c._1)))
       }.toMap,
-      input.headOption.fold(0)(_.length()),
+      input.headOption.fold(0)(_.length),
       input.length
     )
 }
